@@ -1,6 +1,6 @@
-title: 内容安全策略(CSP)
+title: "[翻译]内容安全策略(CSP)"
 date: 2014-03-13 18:15:33
-tags:
+tags: [安全, CSP, 翻译]
 ---
 
 > 原文：[Content Security Policy](https://github.com/blog/1477-content-security-policy)<br>
