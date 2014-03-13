@@ -1,0 +1,130 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>内容安全策略(CSP) - shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2014-03-13T10:15:33.000Z" class="post__time">March 13, 2014</time><h1 class="post__title"><a href="/2014/03/13/Content-Security-Policy/">内容安全策略(CSP)</a></h1></header><div class="post__main"><blockquote>
+<p>原文：<a href="https://github.com/blog/1477-content-security-policy" target="_blank">Content Security Policy</a><br>
+作者：<a href="https://github.com/josh" target="_blank">josh</a></p>
+</blockquote>
+<p><strong> 说明 </strong>：本文是Github全站部署CSP策略过程总结的经验。总体上，CSP安全策略很大程度上解决了JS非同源策略引起的问题，通过JS加载源白名单机制，能够很好的保护用户。</p>
+<p>作为前端，CSP策略所提倡的方案，都是JS和CSS规范的方案，CSP所做的是完全抛弃不规范内联JS写法，只要我们稍微注意就能够做到了，而且这也是一个专业的前端应该做到的。</p>
+<p>另外，框架开发者也应该考虑CSP兼容的问题了，测试过程很简单</p>
+<figure class="highlight"><pre>&lt;?php
+//header(<span class="attribute">'Content</span>-Security-Policy: <span class="keyword">default</span>-src *; <span class="keyword">report</span>-uri /csp/recode.php');
+header(<span class="string">"X-Frame-Options: SAMEORIGIN"</span>);
+header(<span class="string">"Content-Security-Policy: default-src *; script-src 'self' g.tbcdn.cn"</span>);
+</pre></figure>
+
+<hr>
+<p>全文翻译如下：</p>
+<p>我们新部署了一个叫<strong>内容安全策略(CSP)</strong>的策略。对于用户，这能够更好地保护你的账户不被XSS攻击。需要注意的是，这可能引起一些浏览器插件或者书签的问题(译注：浏览器插件使用inline script功能的会被禁止，有一些书签本身是javascript伪协议地址)。</p>
+<p><a href="http://www.w3.org/TR/CSP/" target="_blank">Content Security Policy</a>是一种新的HTTP头域，用于防范XSS攻击来加强网络安全性。CSP通过阻止inline script执行和限制被允许加载的脚本域名来做到(安全防护)。这不意味着你可以不用在服务端过滤用户输入的数据了，而是，当你的过滤器被绕过了，CSP可以给你提供最后一层防御。</p>
+<h2 id="-">准备好你的应用服务器</h2>
+<h3 id="csp-header">CSP header</h3>
+<p>在Rails应用激活CSP是轻松的，它只是一句简单的头信息。你不需要引入任何其他库；设置一个before filter就够了(译注：before filter应该是请求处理前置的hook)。</p>
+<figure class="highlight"><pre>before_filter <span class="symbol">:set_csp</span>
+
+<span class="function"><span class="keyword">def</span> </span>set_csp
+  response.headers[<span class="string">'Content-Security-Policy'</span>] = <span class="string">"default-src *; script-src https://assets.example.com; style-src https://assets.example.com"</span>
+<span class="keyword">end</span>
+</pre></figure>
+
+<p>这个头信息定义可以允许加载内容的白名单url路径。<code>script-scr</code>和<code>style-src</code>指令都是用于配置我们静态资源的域名。然后，除了我们自己的域名之外的脚本都无法加载。最后，<code>default-src</code>是为所有没有定义的配置项设置默认值。比如，<code>image-src</code>和<code>media-src</code>可以用于限定图片、视频和音频的加载地址。</p>
+<p>如果你想让更多地浏览器支持，可以为<code>X-Content-Security-Policy</code>和<code>X-WebKit-CPS</code>设置同样的值。不考虑向后兼容，你只需要设置正确处理标准的<code>Content-Security-Policy</code>(译注：最新的chrome和firefox都已经支持标准协议)。</p>
+<p>由于CSP实现趋于成熟，这在将来也许会成为Rails自身开箱即用的功能。</p>
+<p>开启CSP策略很容易，真正的挑战在于让你应用准备好面对(CSP带来的改变)。</p>
+<h3 id="-">内联脚本</h3>
+<p>除非设置了<code>unsafe-inline</code>，所有的内联脚本标签都会被拦截。这是实现你想要的XSS防御的主要手段。</p>
+<p>大部分内嵌的脚本都是用来配置页面属性的。</p>
+<figure class="highlight"><pre><span class="tag">&lt;<span class="title">script</span> <span class="attribute">type</span>=<span class="value">"text/javascript"</span>&gt;</span><span class="javascript">
+GitHub.user = <span class="string">'josh'</span>
+GitHub.repo = <span class="string">'rails'</span>
+GitHub.branch = <span class="string">'master'</span>
+</span><span class="tag">&lt;/<span class="title">script</span>&gt;</span>
+</pre></figure>
+
+<p>更好地方式是以下代码展示的，把配置信息放在<code>data-*</code>的属性中。</p>
+<figure class="highlight"><pre><span class="subst">&lt;</span>div <span class="built_in">data</span><span class="attribute">-user</span><span class="subst">=</span><span class="string">"josh"</span> <span class="built_in">data</span><span class="attribute">-repo</span><span class="subst">=</span><span class="string">"rails"</span> <span class="built_in">data</span><span class="attribute">-branch</span><span class="subst">=</span><span class="string">"master"</span><span class="subst">&gt;</span>
+<span class="subst">&lt;</span>/div<span class="subst">&gt;</span>
+</pre></figure>
+
+
+<h3 id="-">内联事件绑定</h3>
+<p>和内联脚本标签一样，内联的事件绑定也过时了。</p>
+<p>如果你在2008年之后写过JS，你大概会使用一种不那么直接的方式绑定事件。但是在你的代码库里面，可能还隐藏着一些内联的事件绑定。</p>
+<figure class="highlight"><pre><span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">""</span> <span class="attribute">onclick</span>=<span class="value">"handleClick();"</span>&gt;</span><span class="tag">&lt;/<span class="title">a</span>&gt;</span>
+<span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">"javascript:handleClick();"</span>&gt;</span><span class="tag">&lt;/<span class="title">a</span>&gt;</span>
+</pre></figure>
+
+<p>一直到Rails 3，Rails自带的模板还会通过<code>link_to</code>和<code>form_tag</code>生成一些内联的事件绑定。</p>
+<figure class="highlight"><pre>&lt;<span class="variable">%=</span> link_to <span class="string">"Delete"</span>, <span class="string">"/"</span>, :confirm =&gt; <span class="string">"Are you sure?"</span> <span class="variable">%&gt;</span>
+</pre></figure>
+
+<p>将会输出</p>
+<figure class="highlight"><pre><span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">"/"</span> <span class="attribute">data-confirm</span>=<span class="value">"Are you sure?"</span>&gt;</span>Delete<span class="tag">&lt;/<span class="title">a</span>&gt;</span>
+</pre></figure>
+
+<p>你需要使用UJS引擎，比如<a href="https://github.com/rails/jquery-ujs" target="_blank">jquery-ujs</a>或者<a href="https://github.com/josh/rails-behaviors" target="_blank">rails-behaviors</a>，通过配置data属性来实所有的效果。</p>
+<h3 id="eval">Eval</h3>
+<p><code>eval()</code>的使用是被禁止的，除非配置了<code>unsafe-eval</code>(译注：eval包括其他类似的函数setTimeout, Function).</p>
+<p>尽管你也许没有在代码里直接使用<code>eval()</code>，但你可能使用了某种浏览器端的模板库。通常的，字符串模板在浏览器端被解析编译为JS函数，通过eval的方式执行，这样开发更方便。比如<a href="https://github.com/jeresig" target="_blank">@jeresig</a>的<a href="http://ejohn.org/blog/javascript-micro-templating/" target="_blank">classic micro-templating script</a>。更好地方式，应该使用在服务端预编译模板库，比如<a href="https://github.com/sstephenson/ruby-ejs" target="_blank">sstephenson/ruby-ejs</a>.</p>
+<p>另一个中招的是RJS模板，它通过服务端输出JavaScript。jQuery和Prototype都需要使用<code>eval()</code>来运行RJS模板通过异步请求返回的代码。很不幸这种方式无法正常工作...(译注：这一段关于rjs模板，没看明白，省略了，之和ruby开发者相关)。</p>
+<h3 id="-css">行内CSS</h3>
+<p>除非<code>style-src</code>定义了<code>unsafe-inline</code>，否则所有的html中style属性都是无效的。</p>
+<p>最常用于控制元素加载时隐藏的方式如下</p>
+<figure class="highlight"><pre>&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
+&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span> style=<span class="string">"display:none"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
+&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span> style=<span class="string">"display:none"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
+</pre></figure>
+
+<p>更好的方式是使用CSS状态的class</p>
+<figure class="highlight"><pre>&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab selected"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
+&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
+&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
+</pre></figure>
+
+<figure class="highlight"><pre><span class="class">.tab</span> <span class="rules">{ <span class="rule"><span class="attribute">display</span>:<span class="value"> none </span></span></span>}
+<span class="class">.tab</span><span class="class">.selected</span> <span class="rules">{ <span class="rule"><span class="attribute">display</span>:<span class="value"> block </span></span></span>}
+</pre></figure>
+
+<p>尽管如此，使用此特性还需要谨慎。像jQuery或者Modernizr之类的类库，执行一系列浏览器特性侦探的时候，会在页面注入一些自定义的CSS，这将触发CSP警报而被阻止。暂时，大部分应用都需要禁止这个特性。</p>
+<h2 id="-">缺点</h2>
+<h3 id="-">书签功能</h3>
+<p>CSP文档所定义的，浏览器书签功能应该不受CSP影响.</p>
+<blockquote>
+<p>执行CSP策略应该不干扰用户自定义的脚本比如第三方插件和JavsScript书签的功能</p>
+</blockquote>
+<p><a href="http://www.w3.org/TR/CSP/#processing-model" target="_blank"><a href="http://www.w3.org/TR/CSP/#processing-model">http://www.w3.org/TR/CSP/#processing-model</a></a></p>
+<blockquote>
+<p>每次客户端要执行javascript URI中的脚本时，拒绝执行这些脚本.
+(客户端应该可以执行书签链接中的脚本，即使执行CSP策略的情况.)</p>
+</blockquote>
+<p>但是，没有浏览器正确处理这种情况。都违背CSP定义，阻止书签功能。</p>
+<p>尽管这有点让人沮丧，你也可以在特定条件下禁止Firefox执行CSP。打开<code>about:config</code>，设置<code>security.csp.enable</code>为<code>false</code>.</p>
+<h3 id="-">扩展</h3>
+<p>和书签一样，CSP不支持浏览器插件与页面交互。不过实际上并不总是如此。具体来说，Chrome和Safari，扩展是用JS实现的，通常会修改当前页面，这有可能触发CSP异常。</p>
+<p>Chrome插件<a href="https://lastpass.com/" target="_blank">LastPass</a>就有CSP兼容问题，因为它试图在页面注入<code>&lt;script&gt;</code>标签。我们已经和LastPass开发者报告了这个问题。</p>
+<h3 id="cssom-">CSSOM限制</h3>
+<p>内联CSS是被禁用的，这是CSP默认限制的一部分，除非定义<code>style-src</code>指令为<code>unsafe-inline</code>。这一次，只有Chrome正确的实现这种限制。</p>
+<p>你依然可以通过CSSOM动态修改CSS样式。</p>
+<blockquote>
+<p>客户端同样不能阻止CSS对象模型对样式的控制</p>
+</blockquote>
+<p><a href="http://www.w3.org/TR/CSP/#style-src" target="_blank"><a href="http://www.w3.org/TR/CSP/#style-src">http://www.w3.org/TR/CSP/#style-src</a></a></p>
+<p>这是非常必要的，比如你希望在你的网站上实现一个需要动态绝对定位的自定义提示条效果(译注：提示条需要改变left和top值)。</p>
+<p>对于行内CSS序列化实现还是有一些bug(译注：CSS规则序列化的结果输出为<a href="http://dev.w3.org/csswg/cssom/#dom-cssrule-csstext" target="_blank">cssText</a>，序列化过程指cssText转换为CSSOM的解析过程).</p>
+<p>一个bug具体的例子是克隆一个有CSS属性元素(译注：这个bug已经修复了).</p>
+<figure class="highlight"><pre><span class="built_in">var</span> el <span class="subst">=</span> document<span class="built_in">.</span>createElement(<span class="string">'div'</span>);
+el<span class="built_in">.</span>style<span class="built_in">.</span>display <span class="subst">=</span> <span class="string">'none'</span>
+el<span class="built_in">.</span>cloneNode(<span class="literal">true</span>);
+<span class="subst">&gt;</span> Refused <span class="keyword">to</span> apply <span class="keyword">inline</span> style because it violates the following Content Security Policy directive: <span class="string">"style-src http://localhost"</span><span class="built_in">.</span>
+</pre></figure>
+
+<p>同时，正如前面提到过得，像jQuery和Modernizr这种类库执行一些浏览器特性侦探的时候，在页面注入一些自定义的样式用于测试，可能会引起异常。但愿这些问题能够被这些组件自己去解决。</p>
+<h3 id="-">报告</h3>
+<p>CSP报告的特性是很巧妙的想法(译注：CSP有一个字段report-uri，被CSP规则拦截的时候，会向reqort-uri发送一个请求，报告错误信息)。如果一个攻击者在你的网站上发现一个XSS绕过漏洞，被攻击者访问页面的时候，在CSP开启的情况下XSS攻击会被报告到服务器。这在一定程度上可以作为一个XSS攻击监控系统。</p>
+<p>但是，由于当前书签和浏览器扩展的一些问题，CSP警告的误报会淹没你的后端日志。报告的payload信息也可能很模糊，这取决于浏览器。如果幸运的话，你能获得攻击触发对应的压缩js文件的行数。通常也很难分辨错误是发生在你的JS还是浏览器插件注入的代码。这导致误报无法被过滤。</p>
+<h3 id="-">总结</h3>
+<p>尽管有一些问题，我们还是选择部署CSP策略。希望最新的<a href="http://www.w3.org/TR/CSP11/" target="_blank">CSP 1.1 draft</a>提案能够解决一些问题。</p>
+<p>最后，特别感谢来自谷歌的<a href="https://github.com/mikewest" target="_blank">mikewest</a>给与我们的帮助。</p>
+</div><footer class="post__foot u-cf"><a href="/2014/03/13/Content-Security-Policy/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><div class="comments"><div id="disqus_thread"><noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
+</noscript></div></div></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><span title="Previous" class="page-menu__link icon-arrow-left page-menu__link--disabled"></span></li><li class="page-menu__item"><span title="Next" class="page-menu__link icon-arrow-right page-menu__link--disabled"></span></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
+(document,"script","shepherdwind","embed");
+</script>
