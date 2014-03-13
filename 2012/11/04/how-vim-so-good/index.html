@@ -1,0 +1,73 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>vim如何成为神器 - shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2012-11-04T15:00:21.000Z" class="post__time">November 4, 2012</time><h1 class="post__title"><a href="/2012/11/04/how-vim-so-good/">vim如何成为神器</a></h1></header><div class="post__main"><p>这个问题，让我思考了很久，vim的特色之处到底是什么，最开始使用vim是因为学长的建议，同时vim有着编辑器之神的传说。玉伯指出，vim比起IDE，有些落伍了。这让我很震撼，大家从来都是在讨论vim和emacs之争，很自然的，vim党或者emacs用户，都没有把IDE放在讨论的范畴之类。我等也不过，远远的看着这些所谓的争论，毕竟，我只是一个vim用户而已，那些论战是牛人们的事情，vim有多好，他们自然可以证明，或者说，这无需证明，vim很优秀，这是公论了。</p>
+<p>为此，很荣幸有机会看到玉伯分享IDE的相关操作，确实，IDE有着很多优秀的特性，是vim 所无法做到的。关于此问题的讨论，也没有一个vim用户站出来，像玉伯一样，用一个比较有力的观点说明vim的特色之处。神器毕竟只是一个传说，那么，vim为何成为神器呢？带着这个问题，我翻了很多资料，所获甚少，关于神器的传说，似乎没有出处。</p>
+<p>于是，开始重新仔细阅读vim自带的文档，从vim官网上查看一些信息。可以确定的是vim从来没有自称神器，在一篇vim 20周年的文章中可以看到，vim官网所提出的，为何人们还在使用vim的几个理由：多文件操作(Buffer和分屏)、有模式的、多个寄存器、宏、高度可配置扩展、跨平台。这些，所有的现代编辑器，IDE都(除了多模式)能做到，而且做的都还不错。</p>
+<p>似乎，vim不过一个普通的编辑器而已，但是，作为一个忠实的vim用户，我感觉，这个普通的编辑器，有着自己无可比拟的特殊之处，我觉得，我应该找到这些特殊的，让无数程序员着迷的特性是什么。我个人使用vim不过3年，3年时间，对于一个vim用户来说，一点都不长，甚至是刚入门一会儿，我知道我个人的理解可能不那么准确，但是我还是总结了几点，我个人觉得是vim特色之处，是IDE所不可比拟，是那些IDE的所谓的vim模式所做不到的。</p>
+<p>我认为vim和IDE最大区别在于，vim是有模式的，vim是unix一部分，秉承这unix哲学——一切都是文本，vim中的命令是原子性的，可以随意组合。下面一一解释，vim的特色之处很多，不过也有一些是IDE所擅长的，比如自动提醒之类的，IDE可以内置一个语言引擎，这样提示确实要强大的多。</p>
+<h3 id="-">模式</h3>
+<p>vim的模式，是的vim可以有多种编辑状态，最常用的是普通模式，输入模式，视图模式，命令模式，普通状态是vim的默认模式，所有键盘的按键都是你可以使用的快捷键，这时候，你在用的似乎不是在编辑文本了，更确切的说是，处理文本，键盘不再是输入字符，而是 vim的各种命令。这样，使得vim非常快速做各种改动。写代码过程中，其实我们花更多的时间在调试，修改代码，而不是输入代码，写代码。所以，我们需要vim的正常模式，进入vim 首先进入的是正常模式。</p>
+<p>有人表示，vim的模式看起来非常诡异，让人无法理解，模式切换复杂。其实，古老的vi使用esc进入正常模式，现代的vim已经提供很多其他更方便的方式模式切换 <code>&lt;C-o&gt;, &lt;C-[&gt;, &lt;C-c&gt;</code>(C表示Ctrl键)，vim基本只需要使用大键盘就ok了，因为有模式，可以随意绑定各种快捷键。各种现代的编辑器或者IDE，都有自己的选择模式和命令模式，不过在vim里面，正常模式是特有的，在正常模式下，vim的命令大致分为两种，操作和文本对象，文本对象是的vim里面所有文本区块是各种符合程序员思维的区块，vim提供了丰富的文本对象，w一个单词，p一个段落，s一句话，[]表示一个中括号块，类似的还有 ( ) { }  &lt; &gt; &quot; &#39;，t一个html tag组合，这样的区块在程序代码中经常出现，更多请看<code>:help text-object</code>。确定了区块，然后可以执行各种操作了，比如删除，修改边界符合，在一个区块里进行替换，或者移动某个区块单位。</p>
+<p>正常模式下，使用最多的是光标的移动了。在代码中找到目标代码，有文本区块的概念，就非常容易，比如，我们想在一个{}两端跳转，输入{就可以了，va{就可以选中一个{}包围的区块。也许有人会说，使用鼠标移动要比键盘移动快， vim的h j k l只是一种移动方式，单步移动是最基础的移动方式，vim里面更快速的是使用区块移动，一个单词，一个大括号包围的区块，等等。vim不仅仅可以移动光标，还能移动视窗位置<code>zz zt zb</code>，把光标所在位置设置为视窗中心，或者顶部、底部，这样的功能还是非常实用的。鼠标移动的最大问题是，鼠标是不准确的，如果我们确切知道自己要如何移动，键盘的方式更快速。对于鼠标比较适用模糊定位，vim 也能做到，在光标附近，我们明确想要去某个位置，而不是某个区块的情况下，vim使用 <a href="https://github.com/Lokaltog/vim-easymotion" target="_blank">easymotion</a>插件可以快速而准确定位。具体实现是，把光标位置后面的每个单词的第一个字母标记为a-z 26个字母，然后输入你想要去的单词前面的那个字母，也可以定位到单词所在位置了。你需要做的是两个步骤，高亮单词首字母，选择你要去的位置字母。这和鼠标的速度，至少不相上下，而且更加准确。</p>
+<p>说的有点抽象，举个例子吧：</p>
+<figure class="highlight"><pre>hello world. We <span class="keyword">use</span> vim <span class="keyword">for</span> the ohly editor.
+</pre></figure>
+
+<p>如果光标恰好在world的d上面，现在要去修改oely，把e改为n，vim可以使用<code>2fhrn</code>，这样完成修改，这样或许显得有些繁琐，还得首先调用f进行查找，鼠标可以直接定位修改，那么vim的快速模式，执行的命令是<code>,,w</code>此时，启动easymotion，文本变成了：</p>
+<figure class="highlight"><pre>hello aorld. be cse <span class="keyword">dim</span> eor fhe ghly hditor.
+</pre></figure>
+
+<p>对比前面可以看到，所有单词的第一个字母都有了编号(hellow world变成了hellow aorld，a就是编号，a会高亮，其他都为灰色)，可以很快定位目标单词的位置，然后输入g，跳转到ohly(ohly变成了ghly，g是编号)的o上，输入l右移一个单位，rn，修改h为n，ok完成。这里提到的只是一个基本功能，easymotion可以做更多快速定位操作的。上面这种模式，在vim的选择模式下同样有效：</p>
+<figure class="highlight"><pre>hello world. We <span class="keyword">use</span> vim <span class="keyword">for</span> the only editor.
+hello world. We <span class="keyword">use</span> vim <span class="keyword">for</span> the only editor.
+hello world. We <span class="keyword">use</span> vim <span class="keyword">for</span> the only editor.
+</pre></figure>
+
+<p>上面的代码，如果选中了第一行的hello world，下面我要继续选择第三行的editor，这个时候，vim的easymotion，vim的文本区块选择还是依然有效的，如果是用鼠标，鼠标的选择和键盘是互斥的，你只能老老实实拖拽到第三行吧。这里，其实也是后面要说的，vim一致性体验的一个方面，在各种模式下，所有的操作都是通用的。</p>
+<h3 id="-">一致性</h3>
+<p>一切都是文本，这样其实意味着，在vim里面高度的编码一致性体验。一致性体验，这个只有在vim和emacs里面可以做到的。这意味着，在vim中，你的所有操作，都是vim风格的，处理正常的文本处理，我们有时候需要调用终端，或者文件操作，文件查找等等。在vim里面操作一个文件也是一个文本，这样，修改文件夹和修改文件名一样了。IDE里面总是有着各种窗口，这些窗口彼此是独立的。vim只有一个窗口，在这个窗口里面所有操作都是一致的。</p>
+<p>一致性在上面也提到过，easymotion的移动，在选择模式和正常模式下一致的。在比如，vim 的帮助文档，统一的入口是:help命令，文档是vim的一部分，文档的浏览也是通过 vim的键盘命令导航的。而大多数IDE的帮助文档，都是一个独立的系统。比如在emacs里面，对一个文件夹的操作，和操作一个文本是一致的，这在vim同样可以做到。emacs自带eshell ，终端可以跑在emacs里面，这时候，终端就是emacs的一个buffer，同样在vim也可以做到类似的功能。IDE 可以自带一个shell，不过，ide的shell更像是一个shell的窗口放在ide里面，而vim里面， shell就是vim处理的一个文本，它在vim里面，和普通的文本处理没有本质的差异。或许vim 只能处理文本，所以所有操作都以文本的形式存在，所有操作可以使用同样的键盘命令移动方式使用，nerdtree的文件节点同样是一个buffer，一堆文本。而IDE 里面，文件结构树是IDE一个与编辑窗口不一样的一个窗口对象，IDE的其他窗口里面，编辑模式下的快捷键移动等，都不再有效。</p>
+<h3 id="-">命令组合</h3>
+<p>很多人说，vim里面能够做到的快捷键，IDE都能做到。我觉得，vim里面的操作，很多时候不应该称之为快捷键，应该说是命令，编辑器命令。使用vim操作文本，其实就是在调用编辑器命令。这和IDE所谓的快捷键是完全不同的概念，IDE把命令封装成一系列快捷键，但是这些命令本身对使用者是不可见的，而vim里面，所有按键都是一个最小单位命令：一个操作，一个文本对象区块，或者一种模式，使用vim就是在不停的调用各种命令。比如，daw，在 vim里面表示delete a word，d a w是三个彼此独立的命令，d表示的是执行操作删除，<code>aw</code> 是作用范围，可以看做是函数传递的参数。你可以用d后面接受各种文本区块的组合， <code>aw:a word</code> ， <code>ap:a paragraph</code> 等等，同样，<code>aw</code>前面也可以接受其他任意各种命令，比如v<code>vaw</code>选中，y<code>yaw</code>复制。这是其他任何IDE所做不到的，IDE 里面的快捷键就是一个功能，快捷键是不能拆分成单独命令。命令可以拆分，你可以在各种模式下使用这些最小命令单位。在 vim里面，选择一部分文件修改，和修改整个文件是没有任何区别的。</p>
+<p>命令最小化的优势在于，你能做任意你想做的事情，这些命令的各种组合，记住一个命令，它能够在多种情况下使用，看似命令繁琐，其实命令所作用的方式在vim里面是一致的。y表示复制，对文件的复制用的也是y命令。</p>
+<p>举个例子，vim插件surround，操作文本：&quot;hello&quot;, ds&quot; =&gt; hello，cs&quot;&#39; =&gt; &#39;hello&#39; 。这里使用两个命令<code>ds&quot;</code>和<code>cs&quot;&#39;</code>，乍一看似乎很诡异的语法，其实了解了vim的命令原子特征，就可以很轻松理解这两个命令了，<code>ds&quot;</code>表示<code>delete surround &quot;</code>，双引号在vim表示双引号围起来的区块，d是vim中删除的基本命令，<code>dw</code>删除一个单词，<code>dap</code>删除一个段落。<code>cs&quot;&#39;</code>这个命令表示，<code>change surround &quot; &#39;</code>，c是change的基本命令，这个命令也就很好理解了吧。在 IDE里面，相同的操作大概是一个快捷键，记住那么一个快捷键，你能删除一个&quot;，可能你还得记住另外一个快捷键删除一对括号，一对大括号，一对各种其他符号，这些在vim里面，不用看文档都知道怎么做了吧<code>ds( ds{ ...</code>。更重要的是，这些原子命令，在任何地方都是有效的。每个vim命令都是一个小功能，组成一个强大的文本编辑器，就像 unix由各种小部件构成一样，这是任何IDE所无法做到的。</p>
+<h3 id="-">其他</h3>
+<p>这里讲一个小故事，最近前端模板比较流行使用编译的方式来写语法解析，一般的一套模板语法就是一个和上下文无关的语法规则，比如handlebarsjs，coffeejs。承玉为kissy增加新的xtemplate，同样使用的是Bison的js实现来生成语法规则，Bison语法由yacc和lex两者组成，前者是语法规则，后者是语法中词法规则，语法由词法构成。至于什么是yacc和lex，这里不讨论，咱说的是编辑器。承玉实现了Bison的js版本，kison，同样的js实现还有Jison， handlebarsjs和coffeejs都是用Jison生成解析器的。kison和Jison都接受json文件作为词法和语法规则描述文件，不同的是Jison还支持标准的yacc和lex文件格式，而kissy的xtemplate 语法描述文件是<a href="https://github.com/kissyteam/kissy/blob/master/src/xtemplate/sub-modules/compiler/src/parser-grammar.kison" target="_blank">json</a>的。这是问题的关键，实际上，yacc文件描述要比json容易理解得多。handlebarsjs的语法描述是yacc形式的，coffeejs的语法描述原来也是yacc格式的，不过，后来，改成了coffeejs写的了，coffeejs为了保证coffee源码整体都是coffeejs写的，所以使用了coffeejs形式。但 xtemplate为何会使用json，实际上，yacc转换为json应该不复杂的。而yacc文件描述语言，几乎是语法文档的标准，比如<a href="http://ecma-international.org/ecma-262/5.1/#sec-15.12.1.2" target="_blank">ecma 5.1</a>文档对JSON的描述：</p>
+<figure class="highlight"><pre>JSONText :
+  JSONValue
+
+JSONValue :
+  JSONNullLiteral
+  JSONBooleanLiteral
+  JSONObject
+  JSONArray
+  JSONString
+  JSONNumber
+
+JSONObject :
+  <span class="list">{ }</span>
+  <span class="list">{ JSONMemberList }</span>
+
+JSONMember :
+  JSONString : JSONValue
+
+JSONMemberList :
+  JSONMember
+  JSONMemberList , JSONMember
+
+JSONArray :
+  [ ]
+  [ JSONElementList ]
+
+JSONElementList :
+  JSONValue
+  JSONElementList , JSONValue
+</pre></figure>
+
+<p>这样的描述，不用解释，就都大致可以看明白吧，如果写出json，一方面可读性不好，另一方面，语法有错误也不好定位，没有语法高亮。饶了这么久，终于到正题上了，为啥kissy没有使用yacc而是json，我个人猜测，原因大概是，承玉是开发工具是IntelliJ IDEA，.yy文件根本无法识别，市场上也没有这么一个插件支持yacc语法，这么古老的东西，大概不会有现代编辑器支持了吧。subline text2同样，.yy文件也只能当成是plain text处理。而我也恰好写了一个 velocity的模板解析器，用vim打开.yy的文件，毫无压力，语法高亮，错误提示全部都有。我相信，没有程序员愿意对着一个黑白的编辑器写代码吧。</p>
+<p>故事到此为止，vim是古老一些了，但vim从来不是为某一种语言，某一类开发者准备的，它是一个文本编辑器，能做文本编辑器应该做的一切。也许，大多数前端都在使用js html和 css，一个支持js html css的编辑器就足够了，但是，你永远无法预料自己将要使用什么语言，将会面临什么文件。这一切，在vim看来，都是文本而已，任何文本的编辑处理，纳入到 vim中，它和编辑其他文件没有差异。使用vim，你拥有的不是开发某一种语言的能力，而是一套通用的高效的文本编辑方法，工具。也正是因此，vim在鼠标已经流行了很多年，现代编辑器，IDE发展非常强劲的时代，依然没有被淘汰。 编程环境总在变化，语言自身也在发展，发展如此之快，IntelliJ IDEA的模式，在现在有效，不知道过多少年，它也许就不再有效了。</p>
+<h3 id="-">总结</h3>
+<p>关于vim的神话，那大概只是一个传说。vim只是一个有特色的编辑器而已，也是一个非常值得拥有的工具，它定义了一套独特的文本编辑方案，熟悉它，可以让你在unix上获得自由，可以让你面对文本操作任务，随心所欲，指随意动。同样的，vim只能处理文本，它永远无法做到IDE可以实现的一些功能，但无论如何，都不能抹杀vim的优秀之处。</p>
+</div><footer class="post__foot u-cf"><a href="/2012/11/04/how-vim-so-good/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><div class="comments"><div id="disqus_thread"><noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
+</noscript></div></div></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><a title="Previous" href="/2012/11/29/how-to-realize-a-compiler/" class="page-menu__link icon-arrow-left"></a></li><li class="page-menu__item"><a title="Next" href="/2012/04/27/an-fun-discuss/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
+(document,"script","shepherdwind","embed");
+</script>

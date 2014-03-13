@@ -1,0 +1,224 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>经验分享 - shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2012-11-29T03:10:52.000Z" class="post__time">November 29, 2012</time><h1 class="post__title"><a href="/2012/11/29/how-to-realize-a-compiler/">How to realize velocity template interpreters </a></h1></header><div class="post__main"><h2 id="-">前言</h2>
+<p>承玉曾经写过一篇文章<a href="http://ued.taobao.com/blog/2012/10/11/kissy-dsl-xtemplate/" target="_blank">构建前端DSL</a>，文中提到：</p>
+<blockquote>
+<p>从本质上看模板也是一个微型语言，因此可以从 DSL 的角度着手，使用工具快速构建一个适合于特定前端框架的模板引擎。</p>
+</blockquote>
+<p>本文讨论的话题和承玉的差不多，相信大家都知道coffeescript，handlerbars。承玉的DSL和handlerbars类似，我完成了一个<a href="http://git.shepherdwind.com/velocity.js/" title="velocity" target="_blank">模板语言velocity</a>的解析，更接近coffeescript的编译。在此，与大家分享一些经验，如果你也希望知道coffeescript语法解析如何完成的，那么，这片文章应该对你有所帮助。</p>
+<p>让我们回顾一下2010年D2的时候，Hedger介绍了Closure Compiler，老赵的jscex，他们有一个共同点，都是对js进行编译，让js运行更快或者提供一起额外的功能。编译这么一个似乎和JavaScript没有关系的话题，却逐渐被越来越多的人提起。</p>
+<p>本文主要介绍如何用js写一个编译器，这看起来似乎很高级，实际上，编译原理很复杂，写一个编译器却不怎么难，在做这个模板编译之前，我个人对于编译原理完全不知道的，因为看到coffeescript语法是Jison生成的，然后尝试了一下。写一个编译器，其实就是把一些语法规则翻译成计算机能够理解的结构，计算机所能理解语法规则有专门的描述语言，Yacc + Lex。IBM上有<a href="http://www.ibm.com/developerworks/cn/linux/sdk/lex/index.html" target="_blank">文章</a>如此描述：</p>
+<blockquote>
+<p>Lex 和 Yacc 是 UNIX 两个非常重要的、功能强大的工具。事实上，如果你熟练掌握Lex 和 Yacc 的话，它们的强大功能使创建 FORTRAN 和 C 的编译器如同儿戏。</p>
+</blockquote>
+<p>Yacc + Lex的一个实现是<a href="http://dinosaur.compilertools.net/#bison" target="_blank">Bison</a>，09年Zach Carter为了研究编译原理课程，用js完成了Bison的实现<a href="http://jison.org" target="_blank">Jison</a>, 承玉的<a href="https://github.com/kissyteam/kissy/tree/master/src/kison" target="_blank">kison</a>类似。故事就讲到这里，什么是Yacc，Lex，Bison，Jison，Kison，都不重要，重要的是，这些技术使得我们可以使用简单的方式完成复杂的字符串解析(比如编译)任务。现在我们要来实现一个编译器了，看完就知道这一切了。</p>
+<p>在此声明，对于编译的理解仅限于个人理解，如有不对之处，欢迎指正。</p>
+<h2 id="lex-amp-yacc">Lex &amp; Yacc</h2>
+<p>Lex和Yacc主要用于解决编译中的第一个问题，源文件从字符串变得有意义(结构化数据)。这个过程，又分为两个步骤：</p>
+<ol>
+<li>源文件拆分成各种标志(tokens) Lex</li>
+<li>构造数据结构 Yacc</li>
+</ol>
+<p>学习英语的时候，我们都会遇到语法问题，对于陌生的语言，需要知道其语法规则，计算机语法规则与自然语言类似，只是自然语言是与上下文有关的语言，比起计算机语言复杂得多。与上下文无关，其实就是语言的符号意义是确定的。扯远了，举个例子，一个正常的英语句子:</p>
+<figure class="highlight"><pre>What you <span class="property">name</span>?
+</pre></figure>
+
+<p>回到英文课堂，老师会说，句子是由主语+谓语+宾语构成，这个句子构成的元素是，主语you，谓语what，宾语name，谓语动词前置构成疑问句，疑问句结束用问好。这样的一个语法规则，让计算机理解，需要依据上面的两个步骤：</p>
+<ol>
+<li>识别单词，也就是英语中的主语、谓语和宾语，好吧这些背单词的时候记住就行。标点符号也是词法元素。</li>
+<li><p>语法识别，上面的句子对应的语法是：谓语 + 主语 + 宾语 + 问号 =&gt; 疑问句</p>
+<p>词法识别和英语学习中背单词一样，计算机通过正则在字符串中匹配词，构成语言的基本结构，这些结构按照一定组合规则构成语法。Yacc所做的，是把扫描一串字符串，识别其中的词，把词和所描述的语法一一对照，然后能够得到一些结构化的数据，比如上面英语，计算机就能够知道，这是一个疑问句，疑问句的三个成分是what、you、name，至于这个句子什么意思，你应该如何处理，这是编译过程的第二步了。</p>
+</li>
+</ol>
+<h2 id="velocity-syntax">velocity syntax</h2>
+<p>上面简单描述了一下原理，现在开始写语法规则分析器吧。写编译器就是把一套语法规则描述清楚，就像翻译一篇说明书。当然，我们首先需要能明白说明书的意义，本文以velocity模板语言为例，velocity是Java实现的一套模板，是阿里集体后端webx框架的模板语言，语法规则<a href="http://velocity.apache.org/engine/devel/user-guide.html" target="_blank">文档</a>，可以大致看下语法，或者点击<a href="http://git.shepherdwind.com/velocity.js/try/index.html" target="_blank">此处</a>在线尝试vm解释过程。</p>
+<p>vm(velocity简称)语法规则很简单，大概开5分钟就能学会，vm虽然简单，但是也是一套比较基本的计算机语言的实现了，对比下，英语我们学习了10年，还没能学好，vm只需要5分钟，自然语言的复杂度，比起计算机语言实在不是一个数量级。</p>
+<figure class="highlight"><pre><span class="symbol">#set</span>( <span class="char">$f</span>oo = <span class="comment">"Velocity"</span> )
+<span class="class">Hello</span> <span class="char">$f</span>oo <span class="class">World</span>!
+</pre></figure>
+
+<p>vm语法分为两部分，第一部分是vm语法内容，另一部分是字符串，模板语言都是如此，字符串部分无需考虑，原样输出即可，vm语法主要是前者结构分析。上面的vm输出<code>Hello Velocity World!</code>。语法部分，主要分为两部分References和Directives。</p>
+<h3 id="references-literal">References 和 Literal</h3>
+<p>References是vm中变量，解析时References输出为变量对应的值，模板语言最基本的功能也就是变量替换，vm同样如此，只是vm还有一些其他复杂的功能。Literal和js里面的字面量一直，是vm里面的基本数据结构。vm是一个模板语言，变量的值可以来自外部，而且是主要数据来源，References和Literal这两者构成了vm语法的基本数据。</p>
+<p>References基本形式是<code>$foo</code>，或者加一些修饰符<code>$!{foo}</code>。复杂形式是，变量+属性，支持的属性方式有三种：</p>
+<ul>
+<li>Properties 最普通的属性<code>$foo.bar</code></li>
+<li>Methods 方法<code>$foo.bar()</code>，因为方法是有参数的，参数由References和Literal构成</li>
+<li>Index 索引<code>$foo[&#39;bar&#39;]</code>，index可以是字符串，也可以是变量References</li>
+</ul>
+<p>上面三种方式和js的对象属性查找方式一样，因为存在Methods和Index，方法和Index本身又可以包含References，引用的组成部分可以是引用。这样式描述形成了递归，语法一般都是通过递归的形式来相互包含。引用(References)里包含自身，这如果使用普通的字符串匹配，逻辑上会有些晕。</p>
+<p>Literal是基本的数据结构，分为字符串、map(js中的对象)、数字、数组。map的值由Literal 或者References构成，数组元素同样，字符串和数组相对简单，可以直接从源文件中匹配得到。到此，应该大致明白编译的复杂了吧，就这些基本的数据结构相互包含，要理清其中结构，还是很麻烦的吧，虽然我们可以一眼就知道这些结构，如何让计算机明白，就不那么容易了。不过，通过yacc，我们只需要描述清楚这些结构就行，怎么理清其中关系，Jison会自动处理的。</p>
+<h3 id="directives">Directives</h3>
+<p>前面引用和字面量部分，是vm中关系最复杂的结构了，Directives是一些指令，包括逻辑结构和循环，模块之间引用加载等运算。这些结构比较好搞定，一般都是各自不相干，不像上面，相互引用，纠缠不清。vm解析，最复杂的还是在于引用的确定。</p>
+<p>Directives分为单行指令和多行指令，单行指令作用范围是一句，比如<code>#set</code>、<code>#parse</code>，多行指令主要是<code>#macro</code>,<code>#foreach</code>,<code>if|else|elseif</code>，这些都是通过<code>#end</code>来结束，这样的区分可以在语法分析阶段完成，也可以在后期处理。</p>
+<h2 id="-">语法分析</h2>
+<p>本文有些长，已经开始靠近目标了。上面描述语法的过程，是非常重要的，使用yacc描述语法规则，就是对输入源分类的过程。经过上面的分析，yacc的已经差不多构思好了，接下来把规则用yacc语法写下来就好。</p>
+<p>在写yacc描述之前，需要做一件是，lex词法分析。词法分析就是要找到上面说的References、Literal、Directives的基本元素。新建一个文件<code>velocity.l</code>，开始写lex描述。</p>
+<h3 id="references">References</h3>
+<p>从References开始，vm里面引用的最主要的特征是符号<code>$</code>，首先假设有一个vm字符串：</p>
+<figure class="highlight"><pre>hello <span class="variable">$foo</span> world
+</pre></figure>
+
+<p>其中，<code>$foo</code>是References，很明显References是美元符号开头，<code>$</code>后面跟字母，这里需要引入状态码的概念，因为<code>$</code>后面的字母的意义和<code>$</code>前面的字母意义是不一样的，那么当扫描到<code>$</code>以后，可说我们处于不同的状态，区分好状态，就可以专心处理之和vm语法，否则同样的一个字符，意义就不一样。这个状态，我们用<code>mu</code>表示，状态吗可以随意命名，使用<code>mu</code>，是有渊源的，handlerbars的lex文件因为继承了Mustache语法，<code>mu</code>表示Mustache语法开始，我参考了handlerbars，所以用<code>mu</code>。</p>
+<p>velocity.l写下：</p>
+<figure class="highlight"><pre><span class="variable">%x</span> mu
+
+<span class="variable">%%</span>
+[^#]<span class="variable">*?</span>/<span class="string">"$"</span>         { this.begin(<span class="string">"mu"</span>); <span class="keyword">if</span>(yytext) <span class="keyword">return</span> <span class="string">'CONTENT'</span>; }
+&lt;mu&gt;<span class="string">"$!"</span>           { <span class="keyword">return</span> <span class="string">'DOLLAR'</span>; }
+&lt;mu&gt;<span class="string">"$"</span>            { <span class="keyword">return</span> <span class="string">'DOLLAR'</span>; }
+&lt;INITIAL&gt;&lt;&lt;EOF&gt;&gt;   { <span class="keyword">return</span> <span class="string">'EOF'</span>; }
+</pre></figure>
+
+<p>%x声明有的状态码，状态码和字符串或者正则表达式组合成一个特征，比如<code>&amp;lt;mu&amp;gt;&quot;$&quot;</code>，双引号表示字符串，这个特征描述表示，mu状态下，遇到$，返回DOLLAR。我们用DOLLAR描述$，至于为什么我们要给<code>$</code>一个名字，再次回到英语中，我们会把单词分为名词、动词，各种分类，语法规则不会直接处理某个特定的词如何组合，而是规定某一类词的组合规则，比如，最普通的句子，主语+谓语+宾语，主语一般是名词，谓语是动词，宾语也是名词，这样描述要简单得多，lex词法分析是给字符做最小粒度的分类，最终，一个vm输入源码，可以归纳到一个分类里，符合英语语法的字符串，我们统称为英语。</p>
+<p>特征都使用全大写字母，这是一种约定，因为在yacc描述中，语法规则名都用小写。<code>%%</code>后面第一行，<code>[^#]*?/&quot;$&quot;</code>，这是一个正则表达式，正则分为两个部分，第一部分 <code>[^#]*?</code>匹配所有不是符号#的字符，后面一部分<code>&quot;$&quot;</code>，中间反斜杠分割，是一个向后断言，匹配美元符号前面所有不是符号#的字符，也就是遇到没有符号的时候，后面通过 <code>this.begin</code>开始状态<code>mu</code>。这里使用到yytext，就是前面正则所匹配到的内容，有个细节，这个匹配去除了<code>#</code>，因为<code>#</code>是另一种状态Directives的开始，这里暂时只讨论引用识别。最后一行，表示结束返回，这个无需理解。</p>
+<p>引用的最基本形式，$ + 字母，美元符号识别了，接下来识别后面的字母，使用正则表达式</p>
+<figure class="highlight"><pre> &lt;mu&gt;[<span class="link_label">a-zA-Z</span>][<span class="link_reference">a-zA-Z0-9_</span>]*   { return 'ID'; }
+</pre></figure>
+
+<p>如此，我们可以用这两条规则，开始写第一条yacc语法规则了：</p>
+<figure class="highlight"><pre><span class="tag">reference</span>
+   : <span class="tag">DOLLAR</span> <span class="tag">ID</span>
+       <span class="rules">{ <span class="rule">$$ = {<span class="attribute">type</span>:<span class="value"> <span class="string">"references"</span>, id: $<span class="number">2</span></span></span></span>} }
+   ;
+</pre></figure>
+
+<p>上面描述的是reference，由lex中返回的DOLLAR和ID组合成为一个reference，大括号里面写的是js代码，用于构造结构化数据，需要什么样的数据可以自己随便搞，<code>$$</code>表示返回结果， <code>$1</code>是DOLLAR词对应的字符串，也就是<code>$</code>，<code>$2</code>表示第二个词，也就是ID。复杂的reference可以继续写：</p>
+<figure class="highlight"><pre><span class="keyword">reference</span>
+  : DOLLAR ID
+  | DOLLAR ID attributes 
+  ;
+
+attributes
+  : attribute 
+  | attributes attribute 
+  ;
+
+attribute
+  : <span class="function"><span class="keyword">method</span> 
+  | <span class="title">index</span> 
+  | <span class="title">property</span> 
+  ;</span>
+
+<span class="keyword">property</span>
+  : DOT ID 
+  ;
+
+<span class="keyword">index</span>
+  : BRACKET literal CLOSE_BRACKET 
+  | BRACKET <span class="keyword">reference</span> CLOSE_BRACKET 
+  ;
+</pre></figure>
+
+<p>reference在原来的基础下，增加了attributes，attributes是由一个或者多个属性组成，在yacc中，使用<code>attributes attribute</code>来描述多个属性的情况，规则直接包含自身的情况还是非常常见的。attribute由 <code>method,index,property</code> 组成，继续拆分，<code>index</code>是两个中括号加一个<code>literal</code>或者 <code>reference</code> 组成，我们可以继续对literal进行分类，同样的描述。我们回到了上面对vm 语法描述的那个分类过程只不过，现在我们使用yacc的语法描述，前面使用的是自然语言。</p>
+<h2 id="-">解析过程</h2>
+<p>上面讲了那么多，现在来总结一下Jison解析一个字符串的过程。用一张图表示吧:</p>
+<p><img src="http://img04.taobaocdn.com/tps/i4/T1ozQhXk0fXXXcTDYQ-678-1415.png" alt="lext"></p>
+<p>词汇分析过程就是上面所描述的了，一个lex文件，构成一个词汇表，通过从左到右的扫描输入源，依次匹配词汇表里面定义的模式，然后构成一个个词汇。得到词汇之后，那什么是语法呢，还记得英语语法吗？在计算机里面，语法就是上面所描述的，词汇的组合，规定了词汇的组合形式，比如<code>DOLLAR ID</code>组成一个<code>reference</code>，写yacc语法规则就是不断的对语法进行分类，直到所有的分类最底层都是lex中的词汇，然后语法规则也就ok了。程序会自动根据yacc文件所有定义的规则，分析得到输入源对应的数据结构。</p>
+<p>velocity最终的语法描述在<a href="https://github.com/shepherdwind/velocity.js/tree/master/src/parse" target="_blank">这里</a>。</p>
+<h3 id="-">状态码</h3>
+<p>上面简要描述了yacc和lex工作原理过程，实际中，还是会遇到一些有意思的问题。在写vm解析器的时候，最麻烦的事情是，如何保证括号和中括号的匹配，首先看一段vm字符串：</p>
+<figure class="highlight"><pre><span class="variable">$foo</span>.bar(<span class="variable">$foo</span>.name(<span class="string">"foo"</span>)[<span class="number">1</span>])
+<span class="variable">$foo</span>.bar([)]
+</pre></figure>
+
+<p>经过分析，我发现括号匹配的一个特点是，括号的闭合状态下，它的前一个状态肯定是括号开始，中括号同样如此。因此，我在velocity.l中再引入两种状态，<code>i, c</code>，分别表示括号开始和中括号开始，在匹配到括号或者中括号结束的时候，判断前面的一个状态是否是符号的开始，这样，就能保证括号和中括号的配对。</p>
+<p>在lex词汇分析中，状态码是一个堆栈，这个堆栈通过<code>this.begin</code>开始一个状态，<code>this.popStat</code>退出一个状态，词汇可以是多种状态和正则表达式进行组合，状态的开始和结束，需要自己控制，否则可能会有问题。</p>
+<p>解析最终得到一个对象，这个对象的构造是根据velocity.yy而生成的。如何选择合适的数据结构，这个是很很重要的，后面的语法树解释过程，完全取决于解析器所返回的语法树。在velocity的语法树，最终得到的是一个一维数组，数组的元素分为字符串和对象两种，如果是对象，那么是vm语法需要进行分析解释的。</p>
+<h2 id="-">语法树解释</h2>
+<p>得到输入源语法结构之后的工作，相对而言就容易了，这其中会涉及到两个点，我个人觉得比较有意思的。第一个是局部变量，在vm语法中，有一个指令<code>#macro</code>，这个是vm的函数定义，由函数，自然有形参和实参，在函数执行过程中，形参是局部变量，只在函数解析过程中有效，<code>#foreach</code>也会形成一个局部变量，在foreach中有一个内部变量<code>$foreach.index</code>, <code>$foreach.count</code>, <code>$foreach.hasNext</code>这样的局部变量。</p>
+<p>局部变量的实现，可以参考lex语法分析过程，在语法树解释过程中，增加一个状态码，当进入一个foreach或者macro的时候，生成一个全局唯一的条件id，并且在状态中压入当前的条件id，当foreach和macro运行结束后，推出一个状态。foreach和macro控制状态，同时构造一个数据空间，贮存临时变量，在vm解析过程中，所有的变量查找和设置，都是通过同样的一个函数。当一个变量查询时，检测到存在状态时，首先依次根据状态码，找到对应状态下的局部变量，如果需要查询的变量在局部环境中找到，那么返回局部对象对应的值，如果是这是值，同样如此。这样的实现和js所中的函数执行上下文有点类似，可以继续想象一下如何实现避包，实现避包其实只需要在一个函数中返回一个函数，这样的语法在vm中没有，不过如果真的可以返回一个函数，那么只需要在这个函数和当前函数执行所对应的状态放在一起，并且不释放状态对象的局部变量，那么避包也就有了。</p>
+<h2 id="-">结束</h2>
+<p>本文到此要结束了，不知道是否有说明白，具体实现细节可以参考velocity.js<a href="https://github.com/shepherdwind/velocity.js" target="_blank">源码</a>。</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/前端/" class="post__tag__link">前端</a></li><li class="post__tag__item"><a href="/tags/算法/" class="post__tag__link">算法</a></li><li class="post__tag__item"><a href="/tags/经验分享/" class="post__tag__link">经验分享</a></li></ul><a href="/2012/11/29/how-to-realize-a-compiler/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-03-12T01:00:49.000Z" class="post__time">March 12, 2010</time><h1 class="post__title"><a href="/2010/03/12/winter-vacation-summary/">寒假学习总结</a></h1></header><div class="post__main"><p>一个寒假过来，这几天还在忙于适应学校生活呢。在家里一个多月几乎与电脑完全隔离，几许欣慰，总算不用整天对着电脑啦，呵呵。按照有关规定：每天上网6小时以上属于网瘾，那我们工作室所有人都有网瘾啦。不过技术总无法离我而去，有时候甚至想，来到工作室，一旦进入计算机世界，我就只能如此了吧。而且我越来越清楚的看到，自己对计算机技术的书爱不释手，而本专业的教材却很难静心看下去。无论如何，我总是在挣扎着，专业一定不能放弃啊。我也相信自己能够做到。第一次会上，副部老冯说：“寒假让你们回去看的资料，大家有什么体会，都写下来……”。也许大家都不喜欢做家庭作业吧，我也是，但在寒暑假看一些技术类的书，已然成为我的一种习惯。我觉得，作为程序组人员，对于技术的爱好是一种基本素质，所以我更倡导一种自然的学习方式，大家对什么感兴趣自己去学吧。只要投入，你就能从中发现乐趣的。在这里再提一下我们工作室的口号“激情投入，互动创造”，我很喜欢这句话，大家在工作室应该享受一种投入创造的快乐。下面总结一下我在寒假的学习情况吧。</p>
+<p>寒假带了三本薄薄的书，书贵在精致，而不是数量，一个假期能看两三本书就够了。这三本书分别是，PHP高级程序设计_模式、框架与测试 、JavaScript语言精粹。还有一本是心理学的，就不提啦。这第二本尤其让人震撼，在此我摘一些卓越网的评价：这是一本厚积薄发、“薄”大精深的书。 Douglas Crockford仅仅用了160页来道出JavaScript的语言本质，值得任何正在或者想从事JavaScript开发的人阅读，并且非常需要反复阅读。……重读这本书后，如醍醐灌顶，对JS有了新的认识。不能不说这本JS语言精粹是我读过的一本最好的技术类书。我尤其喜欢这种简约的风格。总的来说，寒假的学习分为三大类，PHP、JavaScript和Vim使用。分别来谈谈</p>
+<p>首先是PHP，这个寒假接触了一些PHP高级技术，比如PHP类、设计模式之类的。我觉得对于我们而言，书中所提到的PHP编码规范是很值得我们学习的，程序代码中的编码规范通常包括两大点：变量的命名和注解规范。还有一点就是代码的缩进，这个通常用tab键实现。常用的变量命名法（也包括css属性名或者class id名）有四种：匈牙利命名法、骆驼命名法、下划线命名法和帕斯卡命名法。在这里各举一个PHP命名的例子</p>
+<p>$strMessage，这里str表示的变量贮存的是一个字符串string，匈牙利命名法关键是：变量名＝属性＋类型＋对象描述</p>
+<p>$nowDateCn，驼峰命名就是当变量名或函式名是由一个或多个单字连结在一起，而构成的唯一识别字时，第一个单字以小写字母开始；第二个单字的首字母大写或每一个单字的首字母都采用大写字母。</p>
+<p>$now_date_cn，下划线命名用下划线分割变量，这在css中属性常用</p>
+<p>$NowDateCn，帕斯卡命名法与驼峰命名法的差别仅仅在于它的第一个单词首字母也是大写的。</p>
+<p>各种命名法其实可以混合使用，尤其是第一种和第三种可以很好的结合在一起使用。需要提醒的是，在一个应用程序中，应该坚持统一的命名规则，这样有利于代码的维护阅读。我想我们工作室最好能够形成一套统一的规范，这个工作我正在考虑当中呢。我们应该给工作室留下一些什么，比如还有我们需要一个常用的类库，这非常有利于我们的快速开发。
+关于注解，PHP常用为 phpdoc模式，如下为一个函数的注解</p>
+<figure class="highlight"><pre><span class="javadoc">/**
+* 提交发送数据返回已序列化的PHP数据内容
+*
+*<span class="javadoctag"> @param</span> string $PostUrl 要指交的远程地址
+*<span class="javadoctag"> @param</span> array $data 要提交的数据
+*<span class="javadoctag"> @return</span> obj  远程返回的对像
+*/</span>
+function getWebServerData($PostUrl,$data)
+{
+<span class="comment">//函数体</span>
+}
+</pre></figure>
+
+<p>第一行为/<em>*，最后一行</em>/，这种注解模式是一种可编译模式，也就是程序在编译时，这些注解不会被PHP解析程序忽视，而是可以成为一种PHP函数或类自身反射的信息数据。反射在程序中指的是一种语言对自身的判断，比如PHP函数func_get_args可以在本函数中或者传入参数序列。这有些想心理学中的元的概念，比如元认知，元记忆，元认知是指人对自身认知活动的时间分配、精力控制等等调控行为，而元记忆指人对自身记忆的记忆，也就是你知道自己记得什么（有些东西虽然自己知道自己记得，但是在某些情况下就是想不起来，比如某个熟人的名字一下子忘记了）。不过这对于我们没有太大的用处，在小规模应用中，很难用到反射的。所以注解用/*开头也行。@param这个表示传入参数，后面是函数参数类型，这个很容易看明白的。注解内容第一行是对本函数的描述。@param，@return这两个参数在函数注解中用得最多。</p>
+<p>再看看Zend framework的注解，常用的还有@author表示作者</p>
+<figure class="highlight"><pre><span class="javadoc">/**
+* Zend Framework
+*
+* LICENSE
+*
+* This source file is subject to the new BSD license that is bundled……
+*
+*<span class="javadoctag"> @category</span>   Zend
+*<span class="javadoctag"> @package</span>    Zend_Db
+*<span class="javadoctag"> @subpackage</span> Table
+*<span class="javadoctag"> @copyright</span>  Copyright (c) 2005-2009 Zend Technologies USA Inc. (http://www.zend.com)
+*<span class="javadoctag"> @license</span>    http://framework.zend.com/license/new-bsd     New BSD License
+*<span class="javadoctag"> @version</span>    $Id: Exception.php 16541 2009-07-07 06:59:03Z bkarwin $
+*/</span>
+</pre></figure>
+
+<p>注解规范也属于代码规范的重要内容之一啦。说这么多其实，我的目的是能够在工作室留下一套常用的PHP类库或函数库，并且告诫程序组成员，代码是人可以阅读的计算机语言，所以可读性很重要。不过一个优秀的好用的函数库或类库，最重要的还是它们的逻辑实现过程，这个得靠大家的一起努力啦。工作室大一组员要加油啦，下学期也许我整个学期都要去实习，工作室重任就落在你们肩上了。此外就是JavaScript啦，这个暂时搁置，有机会给大家做一个 JavaScript专题，现代web技术JavaScript太强大了，这个世界已然不能没有你。那本JavaScript语言精粹，大家想看的可以问我要，现在我又借过来，准备看第二遍呢。</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li><li class="post__tag__item"><a href="/tags/经验分享/" class="post__tag__link">经验分享</a></li></ul><a href="/2010/03/12/winter-vacation-summary/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2009-11-23T01:07:52.000Z" class="post__time">November 23, 2009</time><h1 class="post__title"><a href="/2009/11/23/web-concept/">网站概念——第三次培训总结</a></h1></header><div class="post__main"><p>程序组又加入几个新人，为了让大家能够尽快在同一平台上学习，总结了一下第三次培训的内容，感觉这次培训的内容挺多的，大家可能一时无法完全接受，就在此总结让大家有时间可以回过头看看……</p>
+<p>本次培训的主要目的上让程序组成员对于网站工作的基本原理有所认识，培训以网站概念为核心。</p>
+<p>首先，介绍一下什么是网站：网站是远程服务器端文件以及文件之间逻辑结构（这个只是我的个人理解定义的，为了让大家更直接的感受一下网站实体，这个定义是我们程序组需要直接面对的部分，所以特意的提出来，当然网站还可以从其他角度了理解，我只是从我们程序员角度来定义它）。</p>
+<p>这个概念解释一下，远程端的文件，网络的基本功能就是不同电脑之间文件（或者说数据）传输，Internet把这个世界的电脑都链接在一起，我们在浏览器上看到的任何一个网页都是指向远端（相对于本机而言）电脑上的一个文件。这里还涉及到两个概念，域名和url，域名指向的通常是一个远端的文件夹，比如我们efly的域名efly.nenu.edu.cn指向的就是我们服务器上一个efly的文件夹。url指向的是远端文件，还是我们e翔的url<a href="[http://efly.nenu.edu.cn"><a href="http://efly.nenu.edu.cn">http://efly.nenu.edu.cn</a></a>，这个url并不是完整的，它实际上指向的是<a href="http://efly.nenu.edu.cn/index.asp" target="_blank"><a href="http://efly.nenu.edu.cn/index.asp">http://efly.nenu.edu.cn/index.asp</a></a>，只是一个url可以在没有确定访问的文件时会指向一个默认的文件，这些文件都是一index为文件名，文件的后缀通常有html、htm、php、asp、jsp。随意拿一个url来给大家演示一下：user1/wangchao/archives/2009/2054.html这个url其实和我们本机的“C:\Documents and Settings\Administrator\桌面\团队文化\团队文化\56xiao.jpg”效果是一样的，只不过我们访问本机速度快很多而已。我们打开的是网页，实际上我们是把在我们服务器上的文件给下载到本机上，用浏览器查看，而那个我们下载下来的文件是符合浏览器解释标准的文档，通常是html文档。</p>
+<p>从上面我们可以看出，网站的实体是远端的文件。而实际上由于我们要给浏览者看的文件需要更方便用户查看，所以这些远程文档的组织需要有一定的逻辑结构。首先主页，主页必须让浏览者知道我们的网站有一些什么东西，这个功能主要是由网站的导航实现，第二网站首页需要有网站的信息，比如文章新闻之类的，这部分是需要动态显示，也就是首页的新闻是需要更新的，下面我们想象一下，我们的主页url指向的是一个文件比如index.php，我们怎么才能让这个文件在不同时间不一样呢，应该说是有两种方法：</p>
+<ol>
+<li>随时修改文件本身。</li>
+<li>让文件调用数据库中的数据，通过修改数据库来改变文件的显示。</li>
+</ol>
+<p>我们看第一种方法，在页面简单的情况下到是没有问题，但是通常我们的网页信息更新非常频繁的，这种方法修改主页本身这个过程我们增加了额外的负担（我们只想把一条新闻提前，而这个却让我们需要修改这个主页整个页面）。而第二中方法就可以避免修改整个页面的问题，我们可以直接按照一定的规则选择需要显示的东西放在网页上，这个规则就是网站的文件之间的逻辑结构，这个逻辑结构是由服务器端程序如php代码实现的。</p>
+<p>讲完什么是网站了，在这里因为不好实际的演示，我写一个小小的例子吧：服务器端有一个文件夹example，域名www.example.com指向此文件夹，所以当我在浏览器中输入www.example.com，浏览器会自动向此服务器发送请求，这个请求会被服务器软件（如apache，这个应该讲过）截获，apache会判断这个url指向的是example中一个文件，我们假设它是index.php。这个文件的代码是：</p>
+<figure class="highlight"><pre>echo  date(&quot;<span class="constant">Y</span>-m-d <span class="constant">H</span><span class="symbol">:i</span><span class="symbol">:s&quot</span>;);
+</pre></figure>
+
+<p>这是一个简单的代码，这个代码会在服务器上进行运算，然后这个得到的结果是代码运行时间以2009-11-2316:37:43这种格式输出，这个输出由apache发送，通过http协议发送到浏览器上，然后我们就可以在浏览器上看到2009-11-2316:37:43。什么是网站这个东西大家真正接触了就能更清晰这个概念了。总的来说作为网站程序员我们需要做的是两个，一是浏览器端的显示，我们需要写出符合浏览器端显示的html代码；第二就是后台服务器端的文件之间逻辑结构，这部分以后的培训会讲。</p>
+<p>浏览器端主要由是html代码，很多人简称之为div+css，实际上这个只是为了强调css和html中div标签的作用。这部分更多的是操作性的，程序组的新人要多和一直的程序组的成员多交流。我懒得在讲一遍了，就上传一个网上别人总结的pdf文件DIVCSS布局大全.pdf，应该对大家会有所帮助的。</p>
+<p>公布一下下一次的考核是让大家根据一个psd的图，把它切成html代码的。这个图大家在此下载。在这里说一下考核的标准：</p>
+<ol>
+<li>要求在浏览器上的必须与图片一致，这个要求通常很难达到，大家尽力而为吧</li>
+<li>要求html代码结构清晰，层级之间缩进符合要求，代码要求符合规范，最好能加注解</li>
+<li>要求尽力使文件小，因为我们做的html需要通过网络发送到客户机上，对大小要求是越小越好。</li>
+<li>考核的时间有一个月准备时间，具体的根据你们自己的能力来完成，如果学得快可以提前进入php学习。</li>
+</ol>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/经验分享/" class="post__tag__link">经验分享</a></li></ul><a href="/2009/11/23/web-concept/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2009-06-22T01:37:00.000Z" class="post__time">June 22, 2009</time><h1 class="post__title"><a href="/2009/06/22/php-learning-experience/">PHP学习经验分享</a></h1></header><div class="post__main"><p>前言：很久以前的经验了，现在看来，却不是怎么合适，计算机技术发展太快了。</p>
+<p>某天早上在图书馆看书，其中有一篇文章谈及中国大学与欧美大学的一些差异，作者指出，中国文化传统下，实际山我们一直有一种精英教育的情节——在中国古代一直以来，文化都只掌握在少部分人手中，技术在中国通常是以家族或者师承关系流传下去，也就是说，我们倾向于把自己的技能保留作为一种交换的资源。这种保守的思想在现代社会非常不利于社会的发展，尤其是技术方面。</p>
+<p>就从PHP来说，它本身就是开源社区共同创作的产物。我们可以很明显的感觉到关于php技术的资料在国外更多，如这篇关于dom处理xml的文章<a href="http://www.ibm.com/developerworks/cn/opensource/os-xmldomphp/" target="_blank">http://www.ibm.com/developerworks/cn/opensource/os-xmldomphp/</a> ，几乎所有其他php论坛都引用了（如phpchina），只有在IBM的技术论坛上我才知道这篇文章是出自Jack D. Herrington，中国人喜欢转载可是从来没有注明出处的习惯，这又一定程度上反映我们版权意识太过薄弱，如此文章在IBM技术论坛上还有很多。不是是不是谷歌在同IBM合作还是其他什么原因，每次搜素一些较新的PHP技术（例如xml，yaml等等）文章大都来自<a href="http://www.ibm.com/developerworks/cn/opensource。也许这一切都在谷歌掌控之下，不过那些文章确实写的很好，却都是翻译过来的，而中国的一些论坛通常只是复制粘贴过来而已。" target="_blank">http://www.ibm.com/developerworks/cn/opensource。也许这一切都在谷歌掌控之下，不过那些文章确实写的很好，却都是翻译过来的，而中国的一些论坛通常只是复制粘贴过来而已。</a></p>
+<p>网上不过关于PHP优势的一句话还是很对的 ——关于PHP的问题在网络基本都能找到答案。几乎PHP就是一种开源共享的象征，PHP官方文档就有很多人留下的一些讨论、函数使用实例，虽然全是英文的，但直接拿过来用也就行，没什么不方便的。</p>
+<p>我似乎也算学PHP有一年了，还是有一堆常用函数不会用，每次都要上网去查，写html了就用 Dreamweaver，有时候甚至感觉做PHP似乎也是在做平面——总是在完成一些把某个变量放某处之类的工作。</p>
+<p>当然，在真正做一些东西，是很开心的，就是在做的时候感觉自己应该能完成的更好更快，因而会很烦躁。前天做一个数学建模的论文（选修课），就使用PHP实现一个计算过程，然后把哪一些PHP源码粘在论文上，呵呵不管老师能否看懂，总算字数是够用了。PHP很多时候也可以用来操作本地文件、数据，这很多时候可以省去学习批处理语言精力。</p>
+<p>最后推荐几个PHP学习使用的工具、模板：</p>
+<p>zend studio：专业的PHP编译器，最新的是基于eclipse的，好用的不得了,用了就知道</p>
+<p>Sajax：一个简单的ajax开发框架，它的官网提供各种语言的实现。具体使用如下：定义一个js函数x_fuc()，这个函数php中相对应的有一个fuc的函数，包含Sajax.php，x_fuc的参数中最后一个是处理ajax请求得到的数据，前面几个参数是传人服务器的数据，到php文件中fuc函数中，fuc函数传出的数据发送到x_fuc函数最后一个参数的函数中。实例：js中调用</p>
+<figure class="highlight"><pre>x_fuc(<span class="operator">a</span>,b,doit)()<span class="comment">---&gt;</span>
+</pre></figure>
+
+<p>php服务器端</p>
+<figure class="highlight"><pre>fuc(<span class="variable">$a</span>,<span class="variable">$b</span>){
+  <span class="regexp">//</span>操作
+  <span class="keyword">return</span> <span class="variable">$d</span>;
+}
+</pre></figure>
+
+<p>数据$d发送到js中的函数 doit(d)中</p>
+<figure class="highlight"><pre><span class="function">doit(d)</span>{
+  <span class="function">alert(d)</span>;<span class="comment">//这样就实现一个异步发送过程，过程中其他js文件由Sajax文件处理</span>
+}
+</pre></figure>
+
+<p>Sajax下载的还附带有例子，可以参照使用还有一些大的框架，qeephp之类的，更适合那些大的功能开发。康盛公司的一系列门户网站、论坛、博客系统，康盛旗下还有一个很好的论坛phpchina。一般的问题，谷歌就好，我不喜欢百度，百度搜索PHP函数经常出现一大堆PHP培训广告！</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/经验分享/" class="post__tag__link">经验分享</a></li></ul><a href="/2009/06/22/php-learning-experience/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><span title="Previous" class="page-menu__link icon-arrow-left page-menu__link--disabled"></span></li><li class="page-menu__item"><span title="Next" class="page-menu__link icon-arrow-right page-menu__link--disabled"></span></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
+(document,"script","shepherdwind","count");
+</script>

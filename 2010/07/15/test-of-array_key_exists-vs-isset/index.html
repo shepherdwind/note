@@ -1,0 +1,82 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>isset和array_key_exists的比较测试 - shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2010-07-15T02:10:58.000Z" class="post__time">July 15, 2010</time><h1 class="post__title"><a href="/2010/07/15/test-of-array_key_exists-vs-isset/">isset和array_key_exists的比较测试</a></h1></header><div class="post__main"><p>经常使用isset和array_key_exists测试数组中的变量是否存在，然后忽然很想知道到底两者有什么区别，然后百度了一下，有说 array_key_exists<a href="www.laohucheng.com/post/122/">更快</a>的，也用说isset更快的，当然似乎更多人建议 isset。</p>
+<p>于是自己做了一个测试，比较一下两者的差异：注，本文最初发在<a href="http://codeigniter.org.cn/forums/thread-5991-1-1.html" target="_blank">ci论坛</a></p>
+<p>结果大致如下：</p>
+<p>当数组个数为10时，两者差异就体现出来了——isset速度要快近10倍，但不是很明显，而且对于变量是否存在，两者之间的差异没有太大，当变量存在时运行更快，但是这种趋势在是非常微弱的。使用 array_key_exists随着循环的次数增加，程序运行的时间增加量是成几何级数增加的，当一个数组元素个数超过 1000时运行速度就非常慢了。</p>
+<p>最后总结如下：</p>
+<p>1、isset和array_key_exists在对判断一个数组函数中某个元素是否存在，isset速度要更快，而且这 种速度差异是非常大的</p>
+<p>2、isset属于php中的语言结构，而后者是函数，所以前者更快，isset不可 以用于可变函数</p>
+<p>3、对于变量值的判断，当变量为NULL时，isset返回的结果是false，而后者只判断变量是否存在。所以如果判断一个数组中的某个 元素，并且判断其是否是否为真，应该用isset</p>
+<p>4、isset属于php特定语言结构，后者在其他语言中也存在，更具可读性</p>
+<p>具体测试过程，使用<a href="http://codeigniter.org.cn" target="_blank">ci</a>基准测试类测试</p>
+<figure class="highlight"><pre>    function issetVsArray()
+    {
+        <span class="variable">$loop</span> = <span class="number">10</span>;
+
+        <span class="variable">$test</span> = array();
+        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span> &<span class="keyword">lt</span>;= <span class="variable">$loop</span>; <span class="variable">$i</span>++)
+        {
+            <span class="variable">$test</span>[<span class="string">'test'</span>.<span class="variable">$i</span>] = <span class="variable">$i</span>;
+        }
+
+        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'issetAllFalse'</span>);
+
+        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
+        {
+            isset(<span class="variable">$test</span>[<span class="string">'t'</span>.<span class="variable">$i</span>]);
+        }
+        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'arraysAllFalse'</span>);
+        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
+        {
+            array_key_exists(<span class="string">'t'</span>.<span class="variable">$i</span>,<span class="variable">$test</span>);
+        }
+
+        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'issetAllTrue'</span>);
+        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
+        {
+            isset(<span class="variable">$test</span>[<span class="string">'test'</span>.<span class="variable">$i</span>]);
+        }
+        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'arraysAllTrue'</span>);
+        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
+        {
+            array_key_exists(<span class="string">'test'</span>.<span class="variable">$i</span>,<span class="variable">$test</span>);
+        }
+        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'end'</span>);
+
+        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'issetAllFalse'</span>,<span class="string">'arraysAllFalse'</span>).<span class="string">'&lt;br /&gt;'</span>;
+        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'arraysAllFalse'</span>,<span class="string">'issetAllTrue'</span>).<span class="string">'&lt;br /&gt;'</span>;
+        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'issetAllTrue'</span>,<span class="string">'arraysAllTrue'</span>).<span class="string">'&lt;br /&gt;'</span>;
+        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'arraysAllTrue'</span>,<span class="string">'end'</span>).<span class="string">'&lt;br /&gt;'</span>;
+    }
+</pre></figure>
+
+<p>几次测试结果：</p>
+<figure class="highlight"><pre>循环<span class="number">10</span>次，<span class="variable">$loop</span>=<span class="number">10</span>
+<span class="number">0.0001</span>
+<span class="number">0.0009</span>
+<span class="number">0.0001</span>
+<span class="number">0.0007</span>
+
+循环<span class="number">100</span>次，<span class="variable">$loop</span>=<span class="number">100</span>
+<span class="number">0.0003</span>
+<span class="number">0.0185</span>
+<span class="number">0.0003</span>
+<span class="number">0.0189</span>
+
+循环<span class="number">1000</span>次，<span class="variable">$loop</span>=<span class="number">1000</span>
+<span class="number">0.0015</span>
+<span class="number">0.2831</span>
+<span class="number">0.0020</span>
+<span class="number">0.2839</span>
+
+循环<span class="number">10000</span>次，<span class="variable">$loop</span>=<span class="number">10000</span>
+<span class="number">0.0157</span>
+<span class="number">8.4764</span>
+<span class="number">0.0164</span>
+<span class="number">8.4101</span>
+</pre></figure>
+
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li></ul><a href="/2010/07/15/test-of-array_key_exists-vs-isset/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><div class="comments"><div id="disqus_thread"><noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
+</noscript></div></div></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><a title="Previous" href="/2010/07/16/hierarchical-data-show-in-html/" class="page-menu__link icon-arrow-left"></a></li><li class="page-menu__item"><a title="Next" href="/2010/07/09/love-life/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
+(document,"script","shepherdwind","embed");
+</script>

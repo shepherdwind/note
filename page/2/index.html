@@ -1,0 +1,279 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2010-07-07T07:25:52.000Z" class="post__time">July 7, 2010</time><h1 class="post__title"><a href="/2010/07/07/flowing-wild/">流动的原野</a></h1></header><div class="post__main"><p>折腾了两天，终于发布个人博客了。可喜可贺啊，接下来就慢慢导入文章吧。樊老师听说我要申请域名，然后问：“你要弄几个技术博客吗？能不能弄点赚钱的。”当然，我虽然无法弄一个赚钱的网站，但是，也不能仅仅是一个技术博客吧，呵呵。第一篇文章来一点感性的吧。</p>
+<p>有时候，生活需要某种近似虚幻的感觉，当它忽然出现，会让你感到莫名的惊喜，可是你却永远无法抓住它。写这篇看图作文时似乎又回到了高中，但我终究离它越来越远啊。</p>
+<p>清晨，微微起伏的群山间流动着一层薄薄的薄雾，雾像是一缕缕细纱，轻掩群山那微微羞涩的面庞，这一缕缕的细纱，就这样随意地淡淡地飘向远方，然后与天空的白云融为一体，仿佛这白雾是从天境流下来的。微微浮出云雾间的小山，像海面一座座孤岛，远远望去，那山更像是稍稍起伏的浅绿的草原，这亦山亦草原的世界啊，自然本无须那么多绝对的区分，我更愿意称之为流动的原野，也许，它是自然流动的音符，在某个时刻突然停止，然后永远地留在这云雾间；也许，很久很久以前，那远方的山头，有人曾仰望天地，吟唱着“念天地之悠悠，独怆然而涕下”，“彼者苍天，曷其有极”。</p>
+<p><img src="http://www.shepherdwind.com/wp-content/uploads/2010/07/shan.jpg" alt="" title="流动的原野"></p>
+<p>浩浩山野叠无际，茵茵草原漫无边。雾作纱衣树为马，天高地阔信由僵。（注：此文后面为另一人所做，当时还真以为她是文学院的去）</p>
+<h4 id="-"><strong>眠</strong></h4>
+<p>薄雾升起的时候，太阳还没有出来。雾气微微地升腾、流动、逸散、在山野里漂浮，像渺远的星云，更似翻涌的浪花。也许草地可以伸展、扩展，像无际的毯；疏稀的树可以慢慢走到天边，如沉寂的兽；矮山也可以起伏、绵延，似美人的眉。世界寂静无声，大地已经醒来，蒙古包倚着城堡，只有天知道，她在这里安睡。</p>
+<p>我真想到绵绵的草地里打个滚，一直滚到云雾缭绕的仙境里去！与树木嬉戏，与同山脉私语！以草地为床，以群山为枕，以雪雾为裘——大自然是我永恒的归宿！</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/生活/" class="post__tag__link">生活</a></li></ul><a href="/2010/07/07/flowing-wild/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-06-27T00:17:07.000Z" class="post__time">June 27, 2010</time><h1 class="post__title"><a href="/2010/06/27/listen/">使用php获得听力光盘中需要考试的类容</a></h1></header><div class="post__main"><p>都大三了，还要考听力，是在汗颜啊。作为东师人，大家都知道，听力考试只需要背诵那么几部分，而那基本分的听力都全部在光盘中snd文件夹中，wma格式，OK，那个软件太bt——每次都把电脑分辨率调到800px，都什么时代了，而且看电脑挺太磨叽。直接拷贝出音频还可以在p3上听。</p>
+<p>任务就这样了，作为一个程序员有一个基本素质是：不做重复的工作——那是电脑的任务（vim创始人之语）。10个单元的题目，怎么把它拷贝出来呢？
+首先，把第一单元的听力考出来，放到文件夹“听力”中，一共8个文件，文件名分别是</p>
+<ol>
+<li>u01LIT1f.wav</li>
+<li>u01LIT2f.wav</li>
+<li>u01LIT3f.wav</li>
+<li>u01LSD01f.wav</li>
+<li>u01LSD02f.wav</li>
+<li>u01LSD03f.wav… (1到5)</li>
+</ol>
+<p>然后写一个php脚本：</p>
+<figure class="highlight"><pre>define(<span class="string">'SOURSES'</span>,<span class="string">'G:/snd/'</span>);
+
+<span class="keyword">for</span>(<span class="variable">$i</span>=<span class="number">6</span>;<span class="variable">$i</span>&amp;lt;=<span class="number">10</span>;<span class="variable">$i</span>++)
+{
+    <span class="keyword">for</span>(<span class="variable">$j</span>=<span class="number">1</span>;<span class="variable">$j</span>&amp;lt;=<span class="number">3</span>;<span class="variable">$j</span>++)
+    {
+        <span class="keyword">if</span>(<span class="variable">$i</span>==<span class="number">10</span>)
+        {
+            <span class="variable">$filename</span> = <span class="string">'u'</span>. <span class="variable">$i</span> .<span class="string">'LIT'</span>. <span class="variable">$j</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="keyword">else</span>
+        {
+            <span class="variable">$filename</span> = <span class="string">'u0'</span>. <span class="variable">$i</span> .<span class="string">'LIT'</span>. <span class="variable">$j</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="variable">$p</span> = <span class="keyword">fopen</span>(<span class="variable">$filename</span>,<span class="string">'w+'</span>);
+        copy(SOURSES.<span class="variable">$filename</span>,<span class="variable">$filename</span>);
+        <span class="keyword">fclose</span>(<span class="variable">$p</span>);
+    }
+
+    <span class="keyword">for</span>(<span class="variable">$k</span> = <span class="number">1</span>;<span class="variable">$k</span>&amp;lt;=<span class="number">5</span>;<span class="variable">$k</span>++)
+    {
+        <span class="keyword">if</span>(<span class="variable">$i</span>==<span class="number">10</span>)
+        {
+            <span class="variable">$filename</span> = <span class="string">'u'</span>. <span class="variable">$i</span> .<span class="string">'LSD0'</span>. <span class="variable">$k</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="keyword">else</span>
+        {
+            <span class="variable">$filename</span> = <span class="string">'u0'</span>. <span class="variable">$i</span> .<span class="string">'LIT'</span>. <span class="variable">$j</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="variable">$p</span> = <span class="keyword">fopen</span>(<span class="variable">$filename</span>,<span class="string">'w+'</span>);
+        copy(SOURSES.<span class="variable">$filename</span>,<span class="variable">$filename</span>);
+        <span class="keyword">fclose</span>(<span class="variable">$p</span>);
+    }
+}
+</pre></figure>
+
+<p>Ok，在建立一个a.bat文件输入：</p>
+<figure class="highlight"><pre><span class="variable">$ </span>php a.php
+</pre></figure>
+
+<p>a.php是php文件名，把这两个文件放在最初建立的‘听力’文件夹中，双击 a.bat就可以啦。那个php代码非常简单，只使用了一个copy函数，基本会英语的人就能看明白什么意思
+注：前提是在个人电脑上安装好了 php。当然也可以使用其他语言，但是作为phper，也应该多尝试尝试php的各种功能，还是很有用的</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li></ul><a href="/2010/06/27/listen/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-04-25T00:40:48.000Z" class="post__time">April 25, 2010</time><h1 class="post__title"><a href="/2010/04/25/webshell/">窥视网站木马安装过程——webshell</a></h1></header><div class="post__main"><p>这几天总是发现教科院新网站总是被挂马，第一次听到有人说网站被360浏览器报告有木马，很烦躁，这怎么可能呢……然后想，这个360浏览器也太差了吧， 怎么能够随便报告木马。然后没多久又报告大一信息员在添加文章时候发现居然打开不开文章添加页面了。我一看果然中木马了，于是马上把所有文档下载下来，清 除木马，然后又修补了网站的几个漏洞，查了下sql日志文件，也没有发现什么蛛丝马迹，一点头绪都没有，怎么会这样被修改网页啊。也没有发现可疑文件呀。 就这样一直忙到下午三点半还没有吃饭。</p>
+<p>又过了几天，居然又全部中毒……而且情况基本和上次完全一样，所有目录下的index.php | html | htm文件全部被追加了一段xss代码，还有一个config文件被改，于是又修复了几个漏洞，但是还是不知道这到底怎么回事，新 网站本身的安全性能很高啊，怎么会这样被修改。然后仔细查看了所有文件，还是没有问题。</p>
+<p>这个周末，又发现木马了！实在痛苦，不知是哪里的黑客这么烦人、卑鄙。绝对鄙视这种家伙。又是一次长时间的查看修复。一切恢复以后了，还是和前两次一样。忽然我想也许在老网站的更目录下有 webshell也说不定，新网就放在老网站中的一个文件夹中，如果老网站上有webshell，那新网站无论如何安全也同样只有被宰割的命运了。果然不到一分钟就发现一个怪异的文件z.asp，一看第一行是：</p>
+<figure class="highlight"><pre><span class="attribute">UserPass</span>=<span class="string">&quot;1&quot;     '密码串</span>
+</pre></figure>
+
+<p>这种文件通常就是 webshell了。在此介绍一下什么是webshell吧：webshell对于一个攻击者而言是一个完全占领一个服务器的脚本，webshell和网 站本身所运行的语言是一致的，比如教科院的网站可以运行php文件，也可以运行asp文件，那么这个z.asp就是一个恶意的文件，webshell的一 个特性是可以通过它来查看服务器上的所有文件并且可以随意的操作（包括下载修改删除），这个webshell本身和网站运行权限是一致的。</p>
+<p>传 webshell到服务器上通常有几个途径，直接上传和通过网站漏洞（比如sql注入漏洞，利用网站程序本身写入webshell）。接下来当然是直接删 除webshell啦，还发现一个规律，webshell通常比较大，而一般的一个正常的脚本文件会在30kb以下，所以那些大的可运行文件通常非常可 疑。</p>
+<p>然后，居然在网站上发现了4个webshell，三个asp，一个php的。下面让大家看看webshell怎么工作的吧：
+首先是运行，这个webshell在根目录下，在根目录上我们更容易发现而已，希望在其他目录上不要有才好啊，有机会得写一个webshell检测的工具才 行。对于z.asp这个shell运行很简单，直接输入<a href="http://edu.nenu.edu.cn/z.asp就可以啦，当然这个页已经被我删除" target="_blank">http://edu.nenu.edu.cn/z.asp就可以啦，当然这个页已经被我删除</a> 了，下面是一个很酷的登陆界面</p>
+<p>密码 就在上面了，UserPass=&quot;1&quot; ，输入1就可以就去了</p>
+<p><img src="http://eblog.nenu.edu.cn/UploadFiles/2010-4/425953304.jpg" alt=""></p>
+<p>这就是主页面了，和本地的文件浏览没有什么差别，而且使用也没有什么技术难度，在这里很容易看到了传媒学院 的网站（和教课的网站放在一个目录下，所有的目录都用椭圆盖住了），然后看了下传媒的网站，确实也被注入了脚本，在文件夹旁边就有几个选项 （copy,del,move,Down)，多危险啊，这里还发现了学校主页的备份，webshell下的网站是如此脆弱啊。下面是这个挂木马的工具：</p>
+<p><img src="http://eblog.nenu.edu.cn/UploadFiles/2010-4/425608279.jpg" alt=""></p>
+<p>呵呵，原来木马就是这样插入的啊，还发现这个有扫描木马的功能呢，也许有用。最后在本地机 上实验了一下，果然非常成功地在本身挂上了木马，而且和网站上情况一模一样——所有文件后面追加木马：</p>
+<figure class="highlight"><pre><span class="tag">&lt;<span class="title">iframe</span> <span class="attribute">src</span>=<span class="value">"http://127.0.0.1/m.htm"</span> <span class="attribute">width</span>=<span class="value">0</span>  <span class="attribute">height</span>=<span class="value">0</span>&gt;</span><span class="tag">&lt;/<span class="title">iframe</span>&gt;</span>
+</pre></figure>
+
+<p>这个文件用户在浏览器上是看不到的，高度宽度都等于0，却暗中加载了一些任意的恶意代码。比如获取正在浏览的用户cookie，甚至是控制浏览此网页的用户</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/网络安全/" class="post__tag__link">网络安全</a></li></ul><a href="/2010/04/25/webshell/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-03-12T01:00:49.000Z" class="post__time">March 12, 2010</time><h1 class="post__title"><a href="/2010/03/12/winter-vacation-summary/">寒假学习总结</a></h1></header><div class="post__main"><p>一个寒假过来，这几天还在忙于适应学校生活呢。在家里一个多月几乎与电脑完全隔离，几许欣慰，总算不用整天对着电脑啦，呵呵。按照有关规定：每天上网6小时以上属于网瘾，那我们工作室所有人都有网瘾啦。不过技术总无法离我而去，有时候甚至想，来到工作室，一旦进入计算机世界，我就只能如此了吧。而且我越来越清楚的看到，自己对计算机技术的书爱不释手，而本专业的教材却很难静心看下去。无论如何，我总是在挣扎着，专业一定不能放弃啊。我也相信自己能够做到。第一次会上，副部老冯说：“寒假让你们回去看的资料，大家有什么体会，都写下来……”。也许大家都不喜欢做家庭作业吧，我也是，但在寒暑假看一些技术类的书，已然成为我的一种习惯。我觉得，作为程序组人员，对于技术的爱好是一种基本素质，所以我更倡导一种自然的学习方式，大家对什么感兴趣自己去学吧。只要投入，你就能从中发现乐趣的。在这里再提一下我们工作室的口号“激情投入，互动创造”，我很喜欢这句话，大家在工作室应该享受一种投入创造的快乐。下面总结一下我在寒假的学习情况吧。</p>
+<p>寒假带了三本薄薄的书，书贵在精致，而不是数量，一个假期能看两三本书就够了。这三本书分别是，PHP高级程序设计_模式、框架与测试 、JavaScript语言精粹。还有一本是心理学的，就不提啦。这第二本尤其让人震撼，在此我摘一些卓越网的评价：这是一本厚积薄发、“薄”大精深的书。 Douglas Crockford仅仅用了160页来道出JavaScript的语言本质，值得任何正在或者想从事JavaScript开发的人阅读，并且非常需要反复阅读。……重读这本书后，如醍醐灌顶，对JS有了新的认识。不能不说这本JS语言精粹是我读过的一本最好的技术类书。我尤其喜欢这种简约的风格。总的来说，寒假的学习分为三大类，PHP、JavaScript和Vim使用。分别来谈谈</p>
+<p>首先是PHP，这个寒假接触了一些PHP高级技术，比如PHP类、设计模式之类的。我觉得对于我们而言，书中所提到的PHP编码规范是很值得我们学习的，程序代码中的编码规范通常包括两大点：变量的命名和注解规范。还有一点就是代码的缩进，这个通常用tab键实现。常用的变量命名法（也包括css属性名或者class id名）有四种：匈牙利命名法、骆驼命名法、下划线命名法和帕斯卡命名法。在这里各举一个PHP命名的例子</p>
+<p>$strMessage，这里str表示的变量贮存的是一个字符串string，匈牙利命名法关键是：变量名＝属性＋类型＋对象描述</p>
+<p>$nowDateCn，驼峰命名就是当变量名或函式名是由一个或多个单字连结在一起，而构成的唯一识别字时，第一个单字以小写字母开始；第二个单字的首字母大写或每一个单字的首字母都采用大写字母。</p>
+<p>$now_date_cn，下划线命名用下划线分割变量，这在css中属性常用</p>
+<p>$NowDateCn，帕斯卡命名法与驼峰命名法的差别仅仅在于它的第一个单词首字母也是大写的。</p>
+<p>各种命名法其实可以混合使用，尤其是第一种和第三种可以很好的结合在一起使用。需要提醒的是，在一个应用程序中，应该坚持统一的命名规则，这样有利于代码的维护阅读。我想我们工作室最好能够形成一套统一的规范，这个工作我正在考虑当中呢。我们应该给工作室留下一些什么，比如还有我们需要一个常用的类库，这非常有利于我们的快速开发。
+关于注解，PHP常用为 phpdoc模式，如下为一个函数的注解</p>
+<figure class="highlight"><pre><span class="javadoc">/**
+* 提交发送数据返回已序列化的PHP数据内容
+*
+*<span class="javadoctag"> @param</span> string $PostUrl 要指交的远程地址
+*<span class="javadoctag"> @param</span> array $data 要提交的数据
+*<span class="javadoctag"> @return</span> obj  远程返回的对像
+*/</span>
+function getWebServerData($PostUrl,$data)
+{
+<span class="comment">//函数体</span>
+}
+</pre></figure>
+
+<p>第一行为/<em>*，最后一行</em>/，这种注解模式是一种可编译模式，也就是程序在编译时，这些注解不会被PHP解析程序忽视，而是可以成为一种PHP函数或类自身反射的信息数据。反射在程序中指的是一种语言对自身的判断，比如PHP函数func_get_args可以在本函数中或者传入参数序列。这有些想心理学中的元的概念，比如元认知，元记忆，元认知是指人对自身认知活动的时间分配、精力控制等等调控行为，而元记忆指人对自身记忆的记忆，也就是你知道自己记得什么（有些东西虽然自己知道自己记得，但是在某些情况下就是想不起来，比如某个熟人的名字一下子忘记了）。不过这对于我们没有太大的用处，在小规模应用中，很难用到反射的。所以注解用/*开头也行。@param这个表示传入参数，后面是函数参数类型，这个很容易看明白的。注解内容第一行是对本函数的描述。@param，@return这两个参数在函数注解中用得最多。</p>
+<p>再看看Zend framework的注解，常用的还有@author表示作者</p>
+<figure class="highlight"><pre><span class="javadoc">/**
+* Zend Framework
+*
+* LICENSE
+*
+* This source file is subject to the new BSD license that is bundled……
+*
+*<span class="javadoctag"> @category</span>   Zend
+*<span class="javadoctag"> @package</span>    Zend_Db
+*<span class="javadoctag"> @subpackage</span> Table
+*<span class="javadoctag"> @copyright</span>  Copyright (c) 2005-2009 Zend Technologies USA Inc. (http://www.zend.com)
+*<span class="javadoctag"> @license</span>    http://framework.zend.com/license/new-bsd     New BSD License
+*<span class="javadoctag"> @version</span>    $Id: Exception.php 16541 2009-07-07 06:59:03Z bkarwin $
+*/</span>
+</pre></figure>
+
+<p>注解规范也属于代码规范的重要内容之一啦。说这么多其实，我的目的是能够在工作室留下一套常用的PHP类库或函数库，并且告诫程序组成员，代码是人可以阅读的计算机语言，所以可读性很重要。不过一个优秀的好用的函数库或类库，最重要的还是它们的逻辑实现过程，这个得靠大家的一起努力啦。工作室大一组员要加油啦，下学期也许我整个学期都要去实习，工作室重任就落在你们肩上了。此外就是JavaScript啦，这个暂时搁置，有机会给大家做一个 JavaScript专题，现代web技术JavaScript太强大了，这个世界已然不能没有你。那本JavaScript语言精粹，大家想看的可以问我要，现在我又借过来，准备看第二遍呢。</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li><li class="post__tag__item"><a href="/tags/经验分享/" class="post__tag__link">经验分享</a></li></ul><a href="/2010/03/12/winter-vacation-summary/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2009-11-23T01:07:52.000Z" class="post__time">November 23, 2009</time><h1 class="post__title"><a href="/2009/11/23/web-concept/">网站概念——第三次培训总结</a></h1></header><div class="post__main"><p>程序组又加入几个新人，为了让大家能够尽快在同一平台上学习，总结了一下第三次培训的内容，感觉这次培训的内容挺多的，大家可能一时无法完全接受，就在此总结让大家有时间可以回过头看看……</p>
+<p>本次培训的主要目的上让程序组成员对于网站工作的基本原理有所认识，培训以网站概念为核心。</p>
+<p>首先，介绍一下什么是网站：网站是远程服务器端文件以及文件之间逻辑结构（这个只是我的个人理解定义的，为了让大家更直接的感受一下网站实体，这个定义是我们程序组需要直接面对的部分，所以特意的提出来，当然网站还可以从其他角度了理解，我只是从我们程序员角度来定义它）。</p>
+<p>这个概念解释一下，远程端的文件，网络的基本功能就是不同电脑之间文件（或者说数据）传输，Internet把这个世界的电脑都链接在一起，我们在浏览器上看到的任何一个网页都是指向远端（相对于本机而言）电脑上的一个文件。这里还涉及到两个概念，域名和url，域名指向的通常是一个远端的文件夹，比如我们efly的域名efly.nenu.edu.cn指向的就是我们服务器上一个efly的文件夹。url指向的是远端文件，还是我们e翔的url<a href="[http://efly.nenu.edu.cn"><a href="http://efly.nenu.edu.cn">http://efly.nenu.edu.cn</a></a>，这个url并不是完整的，它实际上指向的是<a href="http://efly.nenu.edu.cn/index.asp" target="_blank"><a href="http://efly.nenu.edu.cn/index.asp">http://efly.nenu.edu.cn/index.asp</a></a>，只是一个url可以在没有确定访问的文件时会指向一个默认的文件，这些文件都是一index为文件名，文件的后缀通常有html、htm、php、asp、jsp。随意拿一个url来给大家演示一下：user1/wangchao/archives/2009/2054.html这个url其实和我们本机的“C:\Documents and Settings\Administrator\桌面\团队文化\团队文化\56xiao.jpg”效果是一样的，只不过我们访问本机速度快很多而已。我们打开的是网页，实际上我们是把在我们服务器上的文件给下载到本机上，用浏览器查看，而那个我们下载下来的文件是符合浏览器解释标准的文档，通常是html文档。</p>
+<p>从上面我们可以看出，网站的实体是远端的文件。而实际上由于我们要给浏览者看的文件需要更方便用户查看，所以这些远程文档的组织需要有一定的逻辑结构。首先主页，主页必须让浏览者知道我们的网站有一些什么东西，这个功能主要是由网站的导航实现，第二网站首页需要有网站的信息，比如文章新闻之类的，这部分是需要动态显示，也就是首页的新闻是需要更新的，下面我们想象一下，我们的主页url指向的是一个文件比如index.php，我们怎么才能让这个文件在不同时间不一样呢，应该说是有两种方法：</p>
+<ol>
+<li>随时修改文件本身。</li>
+<li>让文件调用数据库中的数据，通过修改数据库来改变文件的显示。</li>
+</ol>
+<p>我们看第一种方法，在页面简单的情况下到是没有问题，但是通常我们的网页信息更新非常频繁的，这种方法修改主页本身这个过程我们增加了额外的负担（我们只想把一条新闻提前，而这个却让我们需要修改这个主页整个页面）。而第二中方法就可以避免修改整个页面的问题，我们可以直接按照一定的规则选择需要显示的东西放在网页上，这个规则就是网站的文件之间的逻辑结构，这个逻辑结构是由服务器端程序如php代码实现的。</p>
+<p>讲完什么是网站了，在这里因为不好实际的演示，我写一个小小的例子吧：服务器端有一个文件夹example，域名www.example.com指向此文件夹，所以当我在浏览器中输入www.example.com，浏览器会自动向此服务器发送请求，这个请求会被服务器软件（如apache，这个应该讲过）截获，apache会判断这个url指向的是example中一个文件，我们假设它是index.php。这个文件的代码是：</p>
+<figure class="highlight"><pre>echo  date(&quot;<span class="constant">Y</span>-m-d <span class="constant">H</span><span class="symbol">:i</span><span class="symbol">:s&quot</span>;);
+</pre></figure>
+
+<p>这是一个简单的代码，这个代码会在服务器上进行运算，然后这个得到的结果是代码运行时间以2009-11-2316:37:43这种格式输出，这个输出由apache发送，通过http协议发送到浏览器上，然后我们就可以在浏览器上看到2009-11-2316:37:43。什么是网站这个东西大家真正接触了就能更清晰这个概念了。总的来说作为网站程序员我们需要做的是两个，一是浏览器端的显示，我们需要写出符合浏览器端显示的html代码；第二就是后台服务器端的文件之间逻辑结构，这部分以后的培训会讲。</p>
+<p>浏览器端主要由是html代码，很多人简称之为div+css，实际上这个只是为了强调css和html中div标签的作用。这部分更多的是操作性的，程序组的新人要多和一直的程序组的成员多交流。我懒得在讲一遍了，就上传一个网上别人总结的pdf文件DIVCSS布局大全.pdf，应该对大家会有所帮助的。</p>
+<p>公布一下下一次的考核是让大家根据一个psd的图，把它切成html代码的。这个图大家在此下载。在这里说一下考核的标准：</p>
+<ol>
+<li>要求在浏览器上的必须与图片一致，这个要求通常很难达到，大家尽力而为吧</li>
+<li>要求html代码结构清晰，层级之间缩进符合要求，代码要求符合规范，最好能加注解</li>
+<li>要求尽力使文件小，因为我们做的html需要通过网络发送到客户机上，对大小要求是越小越好。</li>
+<li>考核的时间有一个月准备时间，具体的根据你们自己的能力来完成，如果学得快可以提前进入php学习。</li>
+</ol>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/经验分享/" class="post__tag__link">经验分享</a></li></ul><a href="/2009/11/23/web-concept/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2009-06-22T01:37:00.000Z" class="post__time">June 22, 2009</time><h1 class="post__title"><a href="/2009/06/22/php-learning-experience/">PHP学习经验分享</a></h1></header><div class="post__main"><p>前言：很久以前的经验了，现在看来，却不是怎么合适，计算机技术发展太快了。</p>
+<p>某天早上在图书馆看书，其中有一篇文章谈及中国大学与欧美大学的一些差异，作者指出，中国文化传统下，实际山我们一直有一种精英教育的情节——在中国古代一直以来，文化都只掌握在少部分人手中，技术在中国通常是以家族或者师承关系流传下去，也就是说，我们倾向于把自己的技能保留作为一种交换的资源。这种保守的思想在现代社会非常不利于社会的发展，尤其是技术方面。</p>
+<p>就从PHP来说，它本身就是开源社区共同创作的产物。我们可以很明显的感觉到关于php技术的资料在国外更多，如这篇关于dom处理xml的文章<a href="http://www.ibm.com/developerworks/cn/opensource/os-xmldomphp/" target="_blank">http://www.ibm.com/developerworks/cn/opensource/os-xmldomphp/</a> ，几乎所有其他php论坛都引用了（如phpchina），只有在IBM的技术论坛上我才知道这篇文章是出自Jack D. Herrington，中国人喜欢转载可是从来没有注明出处的习惯，这又一定程度上反映我们版权意识太过薄弱，如此文章在IBM技术论坛上还有很多。不是是不是谷歌在同IBM合作还是其他什么原因，每次搜素一些较新的PHP技术（例如xml，yaml等等）文章大都来自<a href="http://www.ibm.com/developerworks/cn/opensource。也许这一切都在谷歌掌控之下，不过那些文章确实写的很好，却都是翻译过来的，而中国的一些论坛通常只是复制粘贴过来而已。" target="_blank">http://www.ibm.com/developerworks/cn/opensource。也许这一切都在谷歌掌控之下，不过那些文章确实写的很好，却都是翻译过来的，而中国的一些论坛通常只是复制粘贴过来而已。</a></p>
+<p>网上不过关于PHP优势的一句话还是很对的 ——关于PHP的问题在网络基本都能找到答案。几乎PHP就是一种开源共享的象征，PHP官方文档就有很多人留下的一些讨论、函数使用实例，虽然全是英文的，但直接拿过来用也就行，没什么不方便的。</p>
+<p>我似乎也算学PHP有一年了，还是有一堆常用函数不会用，每次都要上网去查，写html了就用 Dreamweaver，有时候甚至感觉做PHP似乎也是在做平面——总是在完成一些把某个变量放某处之类的工作。</p>
+<p>当然，在真正做一些东西，是很开心的，就是在做的时候感觉自己应该能完成的更好更快，因而会很烦躁。前天做一个数学建模的论文（选修课），就使用PHP实现一个计算过程，然后把哪一些PHP源码粘在论文上，呵呵不管老师能否看懂，总算字数是够用了。PHP很多时候也可以用来操作本地文件、数据，这很多时候可以省去学习批处理语言精力。</p>
+<p>最后推荐几个PHP学习使用的工具、模板：</p>
+<p>zend studio：专业的PHP编译器，最新的是基于eclipse的，好用的不得了,用了就知道</p>
+<p>Sajax：一个简单的ajax开发框架，它的官网提供各种语言的实现。具体使用如下：定义一个js函数x_fuc()，这个函数php中相对应的有一个fuc的函数，包含Sajax.php，x_fuc的参数中最后一个是处理ajax请求得到的数据，前面几个参数是传人服务器的数据，到php文件中fuc函数中，fuc函数传出的数据发送到x_fuc函数最后一个参数的函数中。实例：js中调用</p>
+<figure class="highlight"><pre>x_fuc(<span class="operator">a</span>,b,doit)()<span class="comment">---&gt;</span>
+</pre></figure>
+
+<p>php服务器端</p>
+<figure class="highlight"><pre>fuc(<span class="variable">$a</span>,<span class="variable">$b</span>){
+  <span class="regexp">//</span>操作
+  <span class="keyword">return</span> <span class="variable">$d</span>;
+}
+</pre></figure>
+
+<p>数据$d发送到js中的函数 doit(d)中</p>
+<figure class="highlight"><pre><span class="function">doit(d)</span>{
+  <span class="function">alert(d)</span>;<span class="comment">//这样就实现一个异步发送过程，过程中其他js文件由Sajax文件处理</span>
+}
+</pre></figure>
+
+<p>Sajax下载的还附带有例子，可以参照使用还有一些大的框架，qeephp之类的，更适合那些大的功能开发。康盛公司的一系列门户网站、论坛、博客系统，康盛旗下还有一个很好的论坛phpchina。一般的问题，谷歌就好，我不喜欢百度，百度搜索PHP函数经常出现一大堆PHP培训广告！</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/经验分享/" class="post__tag__link">经验分享</a></li></ul><a href="/2009/06/22/php-learning-experience/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2009-04-18T01:50:32.000Z" class="post__time">April 18, 2009</time><h1 class="post__title"><a href="/2009/04/18/a-little-php-program/">一个小小的php程序</a></h1></header><div class="post__main"><p>记得有一次樊老师让我把一个文件夹中所有的文件改一下文件名，弄了很久弄出一个bat的批处理文件，自己还不大明白什么意思，不过终于是弄好了。这次帮朋友下载了一百多个字体，而且每一个都在不同的文件夹中，这样用粘贴复制累死了，我想用php写一个不会有什么问题吧，然后结合网上一些资料，这个家伙弄出来了：</p>
+<figure class="highlight"><pre><span class="comment">/**
+ * 使用方法如下
+ * shift函数的第一个文件为查找文件，后一参数为拷贝后的文件夹,
+ * 后一个文件路径一定不能位于第一个文件中，这样可能进入死循环
+ * 注意:文件路径一定要用/而不是\，路径要全，不能留开口如：H:/fonts；默认的是查找ttf格式字体文件，查找其他需要自行修改
+ * 虽然这些稍加修改就能避免的，但是这仅仅给自己用用，我肯定假设自己会用，故稍加注意就好使
+ * 只要电脑上配有php，在任何地方都可以运行，双击我给的批处理文件就行
+ * 测试发现拷贝大些的文件速度不快，但是对内存和cpu的占有不是很大
+ */</span>
+<span class="function"><span class="keyword">function</span> <span class="title">type</span><span class="params">(<span class="variable">$filename</span>)</span>
+{</span>
+
+    <span class="variable">$match_type</span> = <span class="keyword">array</span>(&quot;ttf&quot;);<span class="comment">//目标后缀数组</span>
+
+    <span class="keyword">foreach</span>(<span class="variable">$match_type</span> <span class="keyword">as</span> <span class="variable">$val</span>)
+    {
+        <span class="comment">//循环匹配数组$match_type中的后缀，自行修改匹配模式可以选择不同的文件名，不分大小写</span>
+        <span class="keyword">if</span>(preg_match(&quot;/\.<span class="variable">$val</span>$/i&quot;,<span class="variable">$filename</span>))
+        {
+            <span class="keyword">return</span> <span class="keyword">true</span>;
+        }
+    }
+
+    <span class="keyword">return</span> <span class="keyword">false</span>;
+}
+
+<span class="function"><span class="keyword">function</span> <span class="title">shift</span><span class="params">(<span class="variable">$dir</span>,<span class="variable">$md</span>)</span>
+{</span>
+    <span class="keyword">if</span>(is_dir(<span class="variable">$dir</span>))
+    {
+        <span class="variable">$pp</span> = fopen(<span class="variable">$md</span>.<span class="string">'message.txt'</span>,&quot;w+&quot;);<span class="comment">//创建信息文件，文件将说明成功复制的文件及失败了文件</span>
+
+        <span class="variable">$mesage</span> = <span class="string">''</span>;<span class="comment">//初始化信息</span>
+
+        <span class="keyword">if</span> (<span class="variable">$dh</span> = opendir(<span class="variable">$dir</span>))
+        {
+            <span class="comment">//循环读取文件中的文件名</span>
+            <span class="keyword">while</span> ((<span class="variable">$file</span>= readdir(<span class="variable">$dh</span>)) !== <span class="keyword">false</span>)
+            {
+
+                <span class="variable">$dir_new</span>=<span class="variable">$dir</span>;
+
+                <span class="variable">$dir_new</span>.=<span class="variable">$file</span>.&quot;/&quot;;
+
+                <span class="comment">//如果是文件夹，递归重新调用shift函数</span>
+                <span class="keyword">if</span>((is_dir(<span class="variable">$dir_new</span>)) &amp;&amp; <span class="variable">$file</span>!=&quot;.&quot; &amp;&amp; <span class="variable">$file</span>!=&quot;..&quot;)
+                {
+                    shift(<span class="variable">$dir_new</span>,<span class="variable">$md</span>);
+                }
+                <span class="keyword">else</span>
+                {
+                    <span class="keyword">if</span>(<span class="variable">$file</span>!=&quot;.&quot; &amp;&amp; <span class="variable">$file</span>!=&quot;..&quot;)
+                    {
+                        <span class="comment">//如果是文件</span>
+                        <span class="keyword">if</span>(type(<span class="variable">$file</span>))
+                        {
+                            <span class="variable">$newfile</span> =<span class="variable">$md</span>.<span class="variable">$file</span>;
+                            <span class="variable">$p</span>=fopen(<span class="variable">$newfile</span>,<span class="string">'w+'</span>);<span class="comment">//在目标文件夹中创建拷贝文件</span>
+                            <span class="keyword">if</span>(copy(<span class="variable">$dir_new</span>,<span class="variable">$newfile</span>))
+                            {<span class="comment">//复制文件</span>
+                                <span class="variable">$mesage</span> .= &quot;成功复制&quot;.<span class="variable">$file</span>.&quot; : <span class="variable">$dir_new</span>=&gt;<span class="variable">$md</span><span class="comment">//记录\n&quot;;</span>
+                            }
+                            <span class="keyword">else</span>
+                            {
+                                <span class="variable">$mesage</span> .= &quot;复制失败&quot;.<span class="variable">$file</span>.&quot;<span class="comment">//记录\n&quot;;</span>
+                            }
+
+                            fclose(<span class="variable">$p</span>);
+
+                        }
+
+                    }
+
+                }
+
+            }
+            closedir(<span class="variable">$dh</span>);
+            fwrite(<span class="variable">$pp</span>,<span class="variable">$mesage</span>);
+            fclose(<span class="variable">$pp</span>);
+        }
+    }
+}
+
+shift(<span class="string">"H:/fonts/"</span>,<span class="string">"E:/ttf/"</span>);
+</pre></figure>
+
+<p>运行使用的bat批处理文件就两句</p>
+<figure class="highlight"><pre><span class="variable">$ </span>php file.php
+</pre></figure>
+
+<p>呵呵，原理php还是很有用嘛……下面是附件，php在本地运行不需要在发布根目录下，只要两个文件在一起就行</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li><li class="post__tag__item"><a href="/tags/php/" class="post__tag__link">php</a></li></ul><a href="/2009/04/18/a-little-php-program/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2007-12-25T23:24:46.000Z" class="post__time">December 26, 2007</time><h1 class="post__title"><a href="/2007/12/26/culture-war/">文化的战争</a></h1></header><div class="post__main"><p>－－关于讲座《中国人的人格》的一些感想</p>
+<p>前言：大一，对大学顶礼膜拜的时代，我们渴望知识，渴望所谓的大师之大学。大概中国的心理学是没有大师吧，咨询课上老师经常说：“面对中国的心理学，我有一中紧迫感啊，中国心理学的希望在你们身上…”。下面是正文：</p>
+<p>先向大家介绍一个人，王登峰：北大心理学教授、教育部什么官我忘了自己去查吧，还有几个东东不懂的话就一起去查查吧；人格纬度、韦氏词典…</p>
+<p>他在周五（12.21）到我们学校搞了一个题为《中国人的人格》的讲座，我就义无返顾的逃课跑去听了。两个小时匆匆而过，而且中国人又那么复杂，岂能在两小时说得清。不过，他还是给我们提供了一种新的、历史的视角去看我们自己。</p>
+<p>问你们一个问题，你人为人的本性是什么？善或恶？我认为这个问题很是很难回答的，通常我们是不会去想这个问题的。但它在无形中做为一种力量影响着我们的一些行为，所以可以从一个人的行为与想法中观察到他对人本性的看法。假如你信基督教，那么你就一定是假设人性本恶，所以才需要主耶稣的帮助，不断的忏悔，也就是所谓的“活出主的荣耀，倒空原罪的自我”，然后你就和耶稣一样了，就可以如天堂了…（也许我理解有误，但大概意思是这样的）。假如你很爱面子，认为做人比做事更重要，那么你通常认为人的本性是善的。既然所有人都是善的好的，而人的生物学本性是自私的（每一个动物只有这样才能生存）我们就很容易意识到自己的恶，就很害怕自己不是“人”---社会所认同的人。如果大家都是坏人，又何必在乎别人的看法。</p>
+<p>从宏观的角度来讲，中国人是认为人性本善的。我们通常表现为个人目标社会化，所以每个中国小孩都想做科学家，这是社会集体意识的体现。而西方人更重视法律的约束，因为他们对人性的假设是恶，只有在一定的规则下社会游戏才能顺利发展下去。他们会更加的重视一个人做了什么事，而不是这是一个什么人。</p>
+<p>至于人格是怎么研究是怎么做的，它的方法也蛮有意思的。很久很久以前（我一不小心没有记∵）, 有个家伙也是不知怎的一不小心就想到历史上所有人的行为都会有一贯相应的词于之对应,所以就可以通过一部词典来研究人格.哈,这个想法太伟大了,他花了几十年查阅韦氏辞典(有多大，可以自己想象,但绝对会超出你的想象的),再经过几代人的努力,弄出个人格的五个纬度,还在动物身上做了同样的研究,发现同样是那五个“格”。毕竟那只是他们的人格，在中国不一定适宜，我们需要自己的研究。王登峰教授是在88年开始做同样的研究的，到99年作成，弄出中国人人格的七个纬度。</p>
+<p>他就用这个人格量表对大量的中国人做了测量。结果是在意料之外，情理之中。</p>
+<p>他得出一系列结论，我记住的就一个：大学生的人格最接近西方人的思维。正如老师说的，我国的教育西化很严重啊！那么，我们毕业以后不是还要重新适应这个社会，或者是慢慢的因此而改变我们的社会，那样我们失去的是一个民族的文化！教育培养的人还有用吗？如此处于两极的我们该如何选择精神支柱？</p>
+<p>老师说，这是一场旷日持久的文化的战争。结局还没有出来。历史上中国已经有过三次同样的文化革新：西周、元、清，前三次都是我们的土地被征服，却用文化同化了他们，我们一直认为自己的文化是好的。但这一次，1840年开始，国人开始怀疑自己的文化，这是很可怕的。</p>
+<p>文化本身没有好坏只之分，只是我们拥有不同的假设，我想没有人希望自己我民族的精神支柱被我们自己毁了吧。</p>
+<p>我还能说些什么呢，社会科学的一些东西总是那么的复杂，比数学什么非齐次高阶线性微分方程什么的还有复杂得多．一句话，还是自然科学好，没有文化地域的差异，在哪都一样．他们那样说来说去还不是就是一群人的利益与另一群人的利益的关系…反正我是搞不懂，也不愿去懂．只是很多东西我们无法选择．当这个世界都这么认为了，你也就只能这样了，主动与被动又有什么区别呢？</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/心理/" class="post__tag__link">心理</a></li></ul><a href="/2007/12/26/culture-war/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><a title="Previous" href="/" class="page-menu__link icon-arrow-left"></a></li><li class="page-menu__item"><span title="Next" class="page-menu__link icon-arrow-right page-menu__link--disabled"></span></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
+(document,"script","shepherdwind","count");
+</script>

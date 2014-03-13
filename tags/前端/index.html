@@ -1,0 +1,197 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>前端 - shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2012-11-29T03:10:52.000Z" class="post__time">November 29, 2012</time><h1 class="post__title"><a href="/2012/11/29/how-to-realize-a-compiler/">How to realize velocity template interpreters </a></h1></header><div class="post__main"><h2 id="-">前言</h2>
+<p>承玉曾经写过一篇文章<a href="http://ued.taobao.com/blog/2012/10/11/kissy-dsl-xtemplate/" target="_blank">构建前端DSL</a>，文中提到：</p>
+<blockquote>
+<p>从本质上看模板也是一个微型语言，因此可以从 DSL 的角度着手，使用工具快速构建一个适合于特定前端框架的模板引擎。</p>
+</blockquote>
+<p>本文讨论的话题和承玉的差不多，相信大家都知道coffeescript，handlerbars。承玉的DSL和handlerbars类似，我完成了一个<a href="http://git.shepherdwind.com/velocity.js/" title="velocity" target="_blank">模板语言velocity</a>的解析，更接近coffeescript的编译。在此，与大家分享一些经验，如果你也希望知道coffeescript语法解析如何完成的，那么，这片文章应该对你有所帮助。</p>
+<p>让我们回顾一下2010年D2的时候，Hedger介绍了Closure Compiler，老赵的jscex，他们有一个共同点，都是对js进行编译，让js运行更快或者提供一起额外的功能。编译这么一个似乎和JavaScript没有关系的话题，却逐渐被越来越多的人提起。</p>
+<p>本文主要介绍如何用js写一个编译器，这看起来似乎很高级，实际上，编译原理很复杂，写一个编译器却不怎么难，在做这个模板编译之前，我个人对于编译原理完全不知道的，因为看到coffeescript语法是Jison生成的，然后尝试了一下。写一个编译器，其实就是把一些语法规则翻译成计算机能够理解的结构，计算机所能理解语法规则有专门的描述语言，Yacc + Lex。IBM上有<a href="http://www.ibm.com/developerworks/cn/linux/sdk/lex/index.html" target="_blank">文章</a>如此描述：</p>
+<blockquote>
+<p>Lex 和 Yacc 是 UNIX 两个非常重要的、功能强大的工具。事实上，如果你熟练掌握Lex 和 Yacc 的话，它们的强大功能使创建 FORTRAN 和 C 的编译器如同儿戏。</p>
+</blockquote>
+<p>Yacc + Lex的一个实现是<a href="http://dinosaur.compilertools.net/#bison" target="_blank">Bison</a>，09年Zach Carter为了研究编译原理课程，用js完成了Bison的实现<a href="http://jison.org" target="_blank">Jison</a>, 承玉的<a href="https://github.com/kissyteam/kissy/tree/master/src/kison" target="_blank">kison</a>类似。故事就讲到这里，什么是Yacc，Lex，Bison，Jison，Kison，都不重要，重要的是，这些技术使得我们可以使用简单的方式完成复杂的字符串解析(比如编译)任务。现在我们要来实现一个编译器了，看完就知道这一切了。</p>
+<p>在此声明，对于编译的理解仅限于个人理解，如有不对之处，欢迎指正。</p>
+<h2 id="lex-amp-yacc">Lex &amp; Yacc</h2>
+<p>Lex和Yacc主要用于解决编译中的第一个问题，源文件从字符串变得有意义(结构化数据)。这个过程，又分为两个步骤：</p>
+<ol>
+<li>源文件拆分成各种标志(tokens) Lex</li>
+<li>构造数据结构 Yacc</li>
+</ol>
+<p>学习英语的时候，我们都会遇到语法问题，对于陌生的语言，需要知道其语法规则，计算机语法规则与自然语言类似，只是自然语言是与上下文有关的语言，比起计算机语言复杂得多。与上下文无关，其实就是语言的符号意义是确定的。扯远了，举个例子，一个正常的英语句子:</p>
+<figure class="highlight"><pre>What you <span class="property">name</span>?
+</pre></figure>
+
+<p>回到英文课堂，老师会说，句子是由主语+谓语+宾语构成，这个句子构成的元素是，主语you，谓语what，宾语name，谓语动词前置构成疑问句，疑问句结束用问好。这样的一个语法规则，让计算机理解，需要依据上面的两个步骤：</p>
+<ol>
+<li>识别单词，也就是英语中的主语、谓语和宾语，好吧这些背单词的时候记住就行。标点符号也是词法元素。</li>
+<li><p>语法识别，上面的句子对应的语法是：谓语 + 主语 + 宾语 + 问号 =&gt; 疑问句</p>
+<p>词法识别和英语学习中背单词一样，计算机通过正则在字符串中匹配词，构成语言的基本结构，这些结构按照一定组合规则构成语法。Yacc所做的，是把扫描一串字符串，识别其中的词，把词和所描述的语法一一对照，然后能够得到一些结构化的数据，比如上面英语，计算机就能够知道，这是一个疑问句，疑问句的三个成分是what、you、name，至于这个句子什么意思，你应该如何处理，这是编译过程的第二步了。</p>
+</li>
+</ol>
+<h2 id="velocity-syntax">velocity syntax</h2>
+<p>上面简单描述了一下原理，现在开始写语法规则分析器吧。写编译器就是把一套语法规则描述清楚，就像翻译一篇说明书。当然，我们首先需要能明白说明书的意义，本文以velocity模板语言为例，velocity是Java实现的一套模板，是阿里集体后端webx框架的模板语言，语法规则<a href="http://velocity.apache.org/engine/devel/user-guide.html" target="_blank">文档</a>，可以大致看下语法，或者点击<a href="http://git.shepherdwind.com/velocity.js/try/index.html" target="_blank">此处</a>在线尝试vm解释过程。</p>
+<p>vm(velocity简称)语法规则很简单，大概开5分钟就能学会，vm虽然简单，但是也是一套比较基本的计算机语言的实现了，对比下，英语我们学习了10年，还没能学好，vm只需要5分钟，自然语言的复杂度，比起计算机语言实在不是一个数量级。</p>
+<figure class="highlight"><pre><span class="symbol">#set</span>( <span class="char">$f</span>oo = <span class="comment">"Velocity"</span> )
+<span class="class">Hello</span> <span class="char">$f</span>oo <span class="class">World</span>!
+</pre></figure>
+
+<p>vm语法分为两部分，第一部分是vm语法内容，另一部分是字符串，模板语言都是如此，字符串部分无需考虑，原样输出即可，vm语法主要是前者结构分析。上面的vm输出<code>Hello Velocity World!</code>。语法部分，主要分为两部分References和Directives。</p>
+<h3 id="references-literal">References 和 Literal</h3>
+<p>References是vm中变量，解析时References输出为变量对应的值，模板语言最基本的功能也就是变量替换，vm同样如此，只是vm还有一些其他复杂的功能。Literal和js里面的字面量一直，是vm里面的基本数据结构。vm是一个模板语言，变量的值可以来自外部，而且是主要数据来源，References和Literal这两者构成了vm语法的基本数据。</p>
+<p>References基本形式是<code>$foo</code>，或者加一些修饰符<code>$!{foo}</code>。复杂形式是，变量+属性，支持的属性方式有三种：</p>
+<ul>
+<li>Properties 最普通的属性<code>$foo.bar</code></li>
+<li>Methods 方法<code>$foo.bar()</code>，因为方法是有参数的，参数由References和Literal构成</li>
+<li>Index 索引<code>$foo[&#39;bar&#39;]</code>，index可以是字符串，也可以是变量References</li>
+</ul>
+<p>上面三种方式和js的对象属性查找方式一样，因为存在Methods和Index，方法和Index本身又可以包含References，引用的组成部分可以是引用。这样式描述形成了递归，语法一般都是通过递归的形式来相互包含。引用(References)里包含自身，这如果使用普通的字符串匹配，逻辑上会有些晕。</p>
+<p>Literal是基本的数据结构，分为字符串、map(js中的对象)、数字、数组。map的值由Literal 或者References构成，数组元素同样，字符串和数组相对简单，可以直接从源文件中匹配得到。到此，应该大致明白编译的复杂了吧，就这些基本的数据结构相互包含，要理清其中结构，还是很麻烦的吧，虽然我们可以一眼就知道这些结构，如何让计算机明白，就不那么容易了。不过，通过yacc，我们只需要描述清楚这些结构就行，怎么理清其中关系，Jison会自动处理的。</p>
+<h3 id="directives">Directives</h3>
+<p>前面引用和字面量部分，是vm中关系最复杂的结构了，Directives是一些指令，包括逻辑结构和循环，模块之间引用加载等运算。这些结构比较好搞定，一般都是各自不相干，不像上面，相互引用，纠缠不清。vm解析，最复杂的还是在于引用的确定。</p>
+<p>Directives分为单行指令和多行指令，单行指令作用范围是一句，比如<code>#set</code>、<code>#parse</code>，多行指令主要是<code>#macro</code>,<code>#foreach</code>,<code>if|else|elseif</code>，这些都是通过<code>#end</code>来结束，这样的区分可以在语法分析阶段完成，也可以在后期处理。</p>
+<h2 id="-">语法分析</h2>
+<p>本文有些长，已经开始靠近目标了。上面描述语法的过程，是非常重要的，使用yacc描述语法规则，就是对输入源分类的过程。经过上面的分析，yacc的已经差不多构思好了，接下来把规则用yacc语法写下来就好。</p>
+<p>在写yacc描述之前，需要做一件是，lex词法分析。词法分析就是要找到上面说的References、Literal、Directives的基本元素。新建一个文件<code>velocity.l</code>，开始写lex描述。</p>
+<h3 id="references">References</h3>
+<p>从References开始，vm里面引用的最主要的特征是符号<code>$</code>，首先假设有一个vm字符串：</p>
+<figure class="highlight"><pre>hello <span class="variable">$foo</span> world
+</pre></figure>
+
+<p>其中，<code>$foo</code>是References，很明显References是美元符号开头，<code>$</code>后面跟字母，这里需要引入状态码的概念，因为<code>$</code>后面的字母的意义和<code>$</code>前面的字母意义是不一样的，那么当扫描到<code>$</code>以后，可说我们处于不同的状态，区分好状态，就可以专心处理之和vm语法，否则同样的一个字符，意义就不一样。这个状态，我们用<code>mu</code>表示，状态吗可以随意命名，使用<code>mu</code>，是有渊源的，handlerbars的lex文件因为继承了Mustache语法，<code>mu</code>表示Mustache语法开始，我参考了handlerbars，所以用<code>mu</code>。</p>
+<p>velocity.l写下：</p>
+<figure class="highlight"><pre><span class="variable">%x</span> mu
+
+<span class="variable">%%</span>
+[^#]<span class="variable">*?</span>/<span class="string">"$"</span>         { this.begin(<span class="string">"mu"</span>); <span class="keyword">if</span>(yytext) <span class="keyword">return</span> <span class="string">'CONTENT'</span>; }
+&lt;mu&gt;<span class="string">"$!"</span>           { <span class="keyword">return</span> <span class="string">'DOLLAR'</span>; }
+&lt;mu&gt;<span class="string">"$"</span>            { <span class="keyword">return</span> <span class="string">'DOLLAR'</span>; }
+&lt;INITIAL&gt;&lt;&lt;EOF&gt;&gt;   { <span class="keyword">return</span> <span class="string">'EOF'</span>; }
+</pre></figure>
+
+<p>%x声明有的状态码，状态码和字符串或者正则表达式组合成一个特征，比如<code>&amp;lt;mu&amp;gt;&quot;$&quot;</code>，双引号表示字符串，这个特征描述表示，mu状态下，遇到$，返回DOLLAR。我们用DOLLAR描述$，至于为什么我们要给<code>$</code>一个名字，再次回到英语中，我们会把单词分为名词、动词，各种分类，语法规则不会直接处理某个特定的词如何组合，而是规定某一类词的组合规则，比如，最普通的句子，主语+谓语+宾语，主语一般是名词，谓语是动词，宾语也是名词，这样描述要简单得多，lex词法分析是给字符做最小粒度的分类，最终，一个vm输入源码，可以归纳到一个分类里，符合英语语法的字符串，我们统称为英语。</p>
+<p>特征都使用全大写字母，这是一种约定，因为在yacc描述中，语法规则名都用小写。<code>%%</code>后面第一行，<code>[^#]*?/&quot;$&quot;</code>，这是一个正则表达式，正则分为两个部分，第一部分 <code>[^#]*?</code>匹配所有不是符号#的字符，后面一部分<code>&quot;$&quot;</code>，中间反斜杠分割，是一个向后断言，匹配美元符号前面所有不是符号#的字符，也就是遇到没有符号的时候，后面通过 <code>this.begin</code>开始状态<code>mu</code>。这里使用到yytext，就是前面正则所匹配到的内容，有个细节，这个匹配去除了<code>#</code>，因为<code>#</code>是另一种状态Directives的开始，这里暂时只讨论引用识别。最后一行，表示结束返回，这个无需理解。</p>
+<p>引用的最基本形式，$ + 字母，美元符号识别了，接下来识别后面的字母，使用正则表达式</p>
+<figure class="highlight"><pre> &lt;mu&gt;[<span class="link_label">a-zA-Z</span>][<span class="link_reference">a-zA-Z0-9_</span>]*   { return 'ID'; }
+</pre></figure>
+
+<p>如此，我们可以用这两条规则，开始写第一条yacc语法规则了：</p>
+<figure class="highlight"><pre><span class="tag">reference</span>
+   : <span class="tag">DOLLAR</span> <span class="tag">ID</span>
+       <span class="rules">{ <span class="rule">$$ = {<span class="attribute">type</span>:<span class="value"> <span class="string">"references"</span>, id: $<span class="number">2</span></span></span></span>} }
+   ;
+</pre></figure>
+
+<p>上面描述的是reference，由lex中返回的DOLLAR和ID组合成为一个reference，大括号里面写的是js代码，用于构造结构化数据，需要什么样的数据可以自己随便搞，<code>$$</code>表示返回结果， <code>$1</code>是DOLLAR词对应的字符串，也就是<code>$</code>，<code>$2</code>表示第二个词，也就是ID。复杂的reference可以继续写：</p>
+<figure class="highlight"><pre><span class="keyword">reference</span>
+  : DOLLAR ID
+  | DOLLAR ID attributes 
+  ;
+
+attributes
+  : attribute 
+  | attributes attribute 
+  ;
+
+attribute
+  : <span class="function"><span class="keyword">method</span> 
+  | <span class="title">index</span> 
+  | <span class="title">property</span> 
+  ;</span>
+
+<span class="keyword">property</span>
+  : DOT ID 
+  ;
+
+<span class="keyword">index</span>
+  : BRACKET literal CLOSE_BRACKET 
+  | BRACKET <span class="keyword">reference</span> CLOSE_BRACKET 
+  ;
+</pre></figure>
+
+<p>reference在原来的基础下，增加了attributes，attributes是由一个或者多个属性组成，在yacc中，使用<code>attributes attribute</code>来描述多个属性的情况，规则直接包含自身的情况还是非常常见的。attribute由 <code>method,index,property</code> 组成，继续拆分，<code>index</code>是两个中括号加一个<code>literal</code>或者 <code>reference</code> 组成，我们可以继续对literal进行分类，同样的描述。我们回到了上面对vm 语法描述的那个分类过程只不过，现在我们使用yacc的语法描述，前面使用的是自然语言。</p>
+<h2 id="-">解析过程</h2>
+<p>上面讲了那么多，现在来总结一下Jison解析一个字符串的过程。用一张图表示吧:</p>
+<p><img src="http://img04.taobaocdn.com/tps/i4/T1ozQhXk0fXXXcTDYQ-678-1415.png" alt="lext"></p>
+<p>词汇分析过程就是上面所描述的了，一个lex文件，构成一个词汇表，通过从左到右的扫描输入源，依次匹配词汇表里面定义的模式，然后构成一个个词汇。得到词汇之后，那什么是语法呢，还记得英语语法吗？在计算机里面，语法就是上面所描述的，词汇的组合，规定了词汇的组合形式，比如<code>DOLLAR ID</code>组成一个<code>reference</code>，写yacc语法规则就是不断的对语法进行分类，直到所有的分类最底层都是lex中的词汇，然后语法规则也就ok了。程序会自动根据yacc文件所有定义的规则，分析得到输入源对应的数据结构。</p>
+<p>velocity最终的语法描述在<a href="https://github.com/shepherdwind/velocity.js/tree/master/src/parse" target="_blank">这里</a>。</p>
+<h3 id="-">状态码</h3>
+<p>上面简要描述了yacc和lex工作原理过程，实际中，还是会遇到一些有意思的问题。在写vm解析器的时候，最麻烦的事情是，如何保证括号和中括号的匹配，首先看一段vm字符串：</p>
+<figure class="highlight"><pre><span class="variable">$foo</span>.bar(<span class="variable">$foo</span>.name(<span class="string">"foo"</span>)[<span class="number">1</span>])
+<span class="variable">$foo</span>.bar([)]
+</pre></figure>
+
+<p>经过分析，我发现括号匹配的一个特点是，括号的闭合状态下，它的前一个状态肯定是括号开始，中括号同样如此。因此，我在velocity.l中再引入两种状态，<code>i, c</code>，分别表示括号开始和中括号开始，在匹配到括号或者中括号结束的时候，判断前面的一个状态是否是符号的开始，这样，就能保证括号和中括号的配对。</p>
+<p>在lex词汇分析中，状态码是一个堆栈，这个堆栈通过<code>this.begin</code>开始一个状态，<code>this.popStat</code>退出一个状态，词汇可以是多种状态和正则表达式进行组合，状态的开始和结束，需要自己控制，否则可能会有问题。</p>
+<p>解析最终得到一个对象，这个对象的构造是根据velocity.yy而生成的。如何选择合适的数据结构，这个是很很重要的，后面的语法树解释过程，完全取决于解析器所返回的语法树。在velocity的语法树，最终得到的是一个一维数组，数组的元素分为字符串和对象两种，如果是对象，那么是vm语法需要进行分析解释的。</p>
+<h2 id="-">语法树解释</h2>
+<p>得到输入源语法结构之后的工作，相对而言就容易了，这其中会涉及到两个点，我个人觉得比较有意思的。第一个是局部变量，在vm语法中，有一个指令<code>#macro</code>，这个是vm的函数定义，由函数，自然有形参和实参，在函数执行过程中，形参是局部变量，只在函数解析过程中有效，<code>#foreach</code>也会形成一个局部变量，在foreach中有一个内部变量<code>$foreach.index</code>, <code>$foreach.count</code>, <code>$foreach.hasNext</code>这样的局部变量。</p>
+<p>局部变量的实现，可以参考lex语法分析过程，在语法树解释过程中，增加一个状态码，当进入一个foreach或者macro的时候，生成一个全局唯一的条件id，并且在状态中压入当前的条件id，当foreach和macro运行结束后，推出一个状态。foreach和macro控制状态，同时构造一个数据空间，贮存临时变量，在vm解析过程中，所有的变量查找和设置，都是通过同样的一个函数。当一个变量查询时，检测到存在状态时，首先依次根据状态码，找到对应状态下的局部变量，如果需要查询的变量在局部环境中找到，那么返回局部对象对应的值，如果是这是值，同样如此。这样的实现和js所中的函数执行上下文有点类似，可以继续想象一下如何实现避包，实现避包其实只需要在一个函数中返回一个函数，这样的语法在vm中没有，不过如果真的可以返回一个函数，那么只需要在这个函数和当前函数执行所对应的状态放在一起，并且不释放状态对象的局部变量，那么避包也就有了。</p>
+<h2 id="-">结束</h2>
+<p>本文到此要结束了，不知道是否有说明白，具体实现细节可以参考velocity.js<a href="https://github.com/shepherdwind/velocity.js" target="_blank">源码</a>。</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/前端/" class="post__tag__link">前端</a></li><li class="post__tag__item"><a href="/tags/算法/" class="post__tag__link">算法</a></li><li class="post__tag__item"><a href="/tags/经验分享/" class="post__tag__link">经验分享</a></li></ul><a href="/2012/11/29/how-to-realize-a-compiler/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2011-05-15T01:05:43.000Z" class="post__time">May 15, 2011</time><h1 class="post__title"><a href="/2011/05/15/peer-say/">同伴提名测验平台</a></h1></header><div class="post__main"><p>因为找工作的事情，在杭州呆了近四个月，然后回到长沙，闲置了一个月，工作还是没有确定，无奈，只能匆匆忙忙赶回学校写论文了，剩不到二十天时间。和<a href="http://www.nenu.edu.cn/professor/pro/show.php?flag=1&amp;id=668" target="_blank">盖老师</a>商量，做实验或者写研究综述都来不及了，于是我说，如果能够做一个毕业设计啥的，也许更容易些。于是，盖老师给我推荐了这么个题目，<a href="http://shepherdwind.com/peersay/" target="_blank">同伴提名测验平台</a>。</p>
+<p>对于任何计算机开发项目，最重要的就是一个词<strong>速度</strong>，开发速度和运行速度，具体来说表现在代码可读性、可维护性、重用以及程序运行的效率、性能等方面。不过，通常程序员写代码的速度会和程序运行速度相冲突的，微观来看，我们经常遇到的就是一个算法中时间与空间的权衡。那么究竟如何处理，这就得依据具体情况而定了。</p>
+<h2 id="-">大胆使用开源吧</h2>
+<p>一直对开源怀有一种敬畏的心态，感觉就像古人瞻仰圣人“高山仰止，景行行止。虽不能至，然心向往之。”有时甚至妄自菲薄，感叹，这个世界有如此完美的技术，强如jQuery、WordPress，那么我们这些程序员还能再做什么呢。当然，那时候我依然停留在Dreamweaver+ZendStudio+WAMP开发时代，实际上，我离开源还有一段好长的距离。同时，作为web开发者，总是对自己作为一个程序员是否合格感到心虚，从传统影响来看，桌面应用才算是真正的程序吧。去一个学校应聘时，那信息中心的老师说，哦，就是一个网页啊，哪里是什么信息系统啊。</p>
+<p>现在想想，任何实现变量、流控制和基本运算的语言不都能完成其他任何一种图灵完全的语言的任务。他们的差别不过在于使用某种语言的人们是如何使用这门语言吧。和JavaScript相比，PHP都显得中规中矩，虽然大多数时间JS让人无比郁闷，但我还是更喜欢那种灵活的使用方式。还尝试过一段时间学习Pascal，我想我无论如何也无法理解，使用它的人们会称之女神。但依然有那么多人能够理解Pascal，任何一种技术，都只有被理解，被使用了，才算是成功的。所以，参与开源，就大胆地使用它们吧。开源之所以存在，不仅仅是为了人们去创造更多有意思的技术，更重要的是它们需要是有价值的，需要被使用。最近，看到<a href="http://ejohn.org/" target="_blank">John Resig</a>在博客上谈到自己转到另一个开源公司了（而且是做教育方面的，呵呵，我也得去搞教育了，不过悲剧的是去教office），我很惊讶，美国那么多开源技术公司，它们是如何生存的，作为中国人，我有些无法理解，开源的公司也能存在。</p>
+<p>讲了这么多废话，开始说说这个同伴提名测验平台吧。</p>
+<h2 id="-mvc">前端MVC</h2>
+<p>第一次听说前端搞MVC还是今年4月初的时候，去阿里云闲谈了一会儿（算是一个不正式的面试吧），被问起你是如何看待前端MVC的。当时顿感鸭梨甚大，就随便答了几句。现在终于明白了，前端的MVC模式最重要的就是解决传统web开发中View层的可重复、模块化开发问题的吧。一年前在雅礼做教师信息平台时，感觉<a href="http://codeigniter.org" target="_blank">Codeigniter</a>的MVC模式非常好用，就是在View层功能实在太弱了。每一个页面都得放一个视图的html文件，完全不可重复。写代码最难受的事情就是复制了。当时很郁闷的在控制器中定义一个数组来配置视图，勉强实现了头部、左侧导航和底部版权信息部分的重用。但是，头部稍微修改一个小链接，就得把View的php代码改得一塌糊涂。最近CI发布新版本，还整合了一个JavaScript类——神啊，JavaScript如此强大，如何能屈居于PHP之下。</p>
+<p>所以，但今天，我再也不能忍受PHP和HTML混在一起了。OK，那就得用MVC模式啦。测验平台还是使用Codeigniter框架，只是它的MVC被我只用了M和C，View只有<a href="https://github.com/shepherdwind/peersay/blob/master/application/views/admin/research_index.php" target="_blank">一个文件</a>，简单定义下HTML头，加载一下css和js，其他的就<a href="https://github.com/shepherdwind/peersay/blob/master/application/views/admin/research_index.php" target="_blank">这么些了</a>，本来和特意准备了一个文件夹来放View的。这就是所谓的单页面web app啦。</p>
+<h3 id="-backbone-http-documentcloud-github-com-backbone-and-seajs-http-seajs-com-"><a href="http://documentcloud.github.com/backbone/" target="_blank">Backbone </a>And <a href="http://seajs.com/" target="_blank">Seajs</a></h3>
+<p>下面最重要的两位上场了，首先谈谈Seajs。在使用YUI时，觉得，那个seed确实很爽，想用什么，直接load就行了，维护页面一堆script标签也是一件非常无聊的事情。在杭州时，就听说玉伯在考虑seajs了，当时想，什么都mixin，和我直接把其他对象的prototype引用过来有啥不一样吗。现在看看，就简单的这样引人类似于YUI中的seed文件了</p>
+<figure class="highlight"><pre><span class="tag">&lt;<span class="title">script</span> <span class="attribute">src</span>=<span class="value">"assets/js/sea.js"</span> <span class="attribute">type</span>=<span class="value">"text/javascript"</span>&gt;</span><span class="javascript"></span><span class="tag">&lt;/<span class="title">script</span>&gt;</span>
+</pre></figure>
+
+<p>比YUI更酷的是，这个seed完全不用配置，而且足够小巧。下面简单谈谈自己使用seajs的一些感受，不过这么十来天，seajs已经发布0.9正式版了，我使的是beta版，也许有所出入吧。</p>
+<ol>
+<li>seajs中的require运行就像js中var申明，所谓的代码提升，不管这段代码发在什么地方，require都会先运行，所以这样是无效的,require总是会把所需要的js引入的：
+<code>try { JSON; } catch (e ) { require(&quot;libs/json2&quot;); }</code></li>
+<li>在定义一个module时，定义依赖关系，最好使用require，只有在某些情况(必须需要条件判断)才使用module.load来根据某种事件来执行某个js文件，<a href="http://github.com/shepherdwind/peersay/blob/master/assets/js/app/app.js#L127" target="_blank">例如此处</a>。</li>
+<li><a href="http://github.com/seajs/seajs/issues/40" target="_blank">seajs最好放在js文件根目录上</a>，这样好处理依赖关系，并且可以使用相对路径</li>
+<li>最后，虽然seajs约定所有变量输出需要使用module.exports，但是，有些时候，如果必须打破约定，就直接忽视约定吧。规矩是人定的，如何使用才是最重要的。<a href="http://github.com/shepherdwind/peersay/blob/master/assets/js/libs/ckeditor/ckeditor.js" target="_blank">这里</a>使用ckeditor就只能把CKEDITOR释放了。<a href="http://github.com/shepherdwind/peersay/blob/master/assets/js/libs/json.js" target="_blank">这里</a>使用json2.js，都没有define直接用module.load(&#39;libs/json&#39;)了(额，我也刚发现，这样也能用)。
+对于Backbone，我觉得如果是简单的模型数据操作，最重要的模块是View。通常模型只需要定义一下url属性和validate方法即可（<a href="http://github.com/shepherdwind/peersay/blob/master/assets/js/app/models/test.js" target="_blank">例如</a>）。url定义当模型调用fetch或者save方法时，向哪一个url发送请求，而validate则是定义save模型属性时，会执行validate方法，如果validate返回错误信息，则save或者set方法将返回error，然后触发error事件，再然后，我们想怎么样就怎么样啦，我们只需要关注发生什么事情了，这就是基于事件模型的js的巨大优势了。Model主要负责数据的操作，从后端返回的JSON对象的所有属性会被copy到Model上，这里，需要非常小心的是，Backbone使用了JSON对象，而JSON全局对象在IE 7中没有，所以只能调用老道的<a href="https://github.com/douglascrockford/JSON-js" target="_blank">json.js</a>。为了不至于报错（关于js对象判断，<a href="http://www.ruanyifeng.com/blog/2011/05/how_to_judge_the_existence_of_a_global_object_in_javascript.html" target="_blank">参考此文</a>），我使用了自认为很酷的。</li>
+</ol>
+<figure class="highlight"><pre><span class="keyword">try</span> {
+  <span class="built_in">JSON</span>;
+}<span class="keyword">catch</span> (e){
+  module.load(<span class="string">'lib/json'</span>); <span class="comment">//加载json2.js</span>
+}
+</pre></figure>
+
+<p>对于controller，如果和我一样使用PHP，则需要配置Backbone.emulateHTTP = true;Backbone.emulateJSON = true;并且，所有的路由必须在Backbone.history.start();运行以后才能开始追踪url改变的事件。</p>
+<h2 id="-">关于用户体验</h2>
+<p>再补充一些关于用户体验的，关于什么是用户体验，每个角色都会有不同的定义，视觉注重美观，而前端的我们呢。刚刚做这个项目时，我最想尝试使用炫酷的技术，那是用户体验的内容吗？在测验中，需要做选择，最初，我使用的是推拽，花了好多时间解决那些选项扰人的关系，拖拽了的是被选中的还是未选中的，拖拽的目的地是选中还是未选中，晕了半天终于搞定了。第二天，看看觉得拖拽实在麻烦，当选择过多时还得提示，怎么提示呢——使用弹窗，使用jQuery UI的Dialog可以华丽的跳出来，然后绚烂地离开。但事实上，这些华丽却阻止了用户的行为，过大的干扰，和直接使用alert没有多少差别。</p>
+<p>想想还是尽可能对用户少一些干扰好吧。如此，便整体上重构代码，把花了大半天实现的拖拽效果和弹窗提示并禁止继续选择的代码全部删掉。把所有的选择项目由achor标签改为checkbox，看了很久觉得有些舍不得，但还是都改了，做了一个飞跃的效果（选中一个则从下面的box中跳出到上面，反之亦然）——程序员总是忘不了炫耀自己的技术，尤其是前端。代码简单了，我却有些甘心了。</p>
+<p>到了今天终于发布了，拿到班上进行测验。班上同学都非常支持，尤其是女生，刚发有动作了，非常感谢她们。然后，有人发来回馈，找名字找得好累啊，把字调大一些吧。最后，同学说，一个东西跑了其他得都需要往前跳一个位置，眼花缭乱的，干脆把跳跃的效果也删了。这时候Backbone的MVC威力大显，只需要稍微修改一些html模板，然后删除跳跃动画的函数就行了。小小的删除，却删去我费了好多精力写的代码。但是，用户体验与程序员的技术无关啊，我需要的自己的东西给用户使用，这才是真正用户体验所要关注的吧，很多时候使用简单的方法实现就好，关键是有效吧。</p>
+<h2 id="-">结束语</h2>
+<p>转眼一个下午过去了啊，暂时就写到这里吧，以后再补充。最后发一下发布线上的<a href="http://shepherdwind.com/peersay/" target="_blank">地址</a>，使用测试账户可以登陆玩玩，用户名从被试1-被试31，密码是全拼。</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php/" class="post__tag__link">php</a></li><li class="post__tag__item"><a href="/tags/前端/" class="post__tag__link">前端</a></li></ul><a href="/2011/05/15/peer-say/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-12-18T20:03:50.000Z" class="post__time">December 19, 2010</time><h1 class="post__title"><a href="/2010/12/19/d2-some-feeling/">第五届D2前端技术论坛的一些感受</a></h1></header><div class="post__main"><p>来到杭州十多天了，恰好赶上<a href="http://www.d2forum.org/" target="_blank">D2前端大会</a>，非常幸运，发过微薄，还觉得不过瘾。</p>
+<p>前端这个行业似乎越来越强大了，虽然国内比世界还慢了两年，但<span style="text-decoration: line-through;">从07年淘宝首先招聘前端工程师</span>（根据<a href="http://woooh.com/" target="_blank">Aether</a>提供的信息，此处有误，中国何时开始有前端这个职位无从考证了）。在大会上还看到华为的工程师过来，还有思科来的嘉宾的杜欢，这些看起来和web没有关系的公司都对前端如此有兴趣，让我很是惊讶。</p>
+<p>回顾上周刚刚结束的<a href="http://velocity.oreilly.com.cn/" target="_blank">velocity中国web性能大会</a>，D2显得更加本土化。这样也好，让我们首先看看国外大神强如facebook都在干啥，再回顾回顾我们自己，不能只看着硅谷，那些大公司哪个能够在中国的大地占领市场呢。</p>
+<h2 id="-">嘉宾</h2>
+<p>这次来的嘉宾最有趣的要是来自谷歌的<a href="http://www.d2forum.org/d2/5/guest.html" target="_blank">Hedger</a>了，还好他是华人，汉语讲得够过二甲了。土豆的<a href="http://www.d2forum.org/d2/5/guest.html" target="_blank">杨扬</a>和淘宝系列都源自阿里集团，而阿里的技术又源自雅虎，<a href="http://www.d2forum.org/d2/5/guest.html" target="_blank">Hedger</a>也从雅虎出来的，向雅虎致敬。最后，辣妈的出现，让我们都非常惊喜，呵呵，还有很多人不知道辣妈吧，她是现场唯一的女嘉宾，不过提起今年的js版植物大战僵尸，没有人（前端业内）没有听说过吧，辣妈就是js版植物大战僵尸的作者。辣妈应该说是勇敢的探险者，就像css禅意花园，做了一些伟大的尝试。有些事情从理论上分析也许不难实现，而理论在成为实现之前都只能说是一种可能，把理想实现者，给我们的是希望，现实的希望，我们原来真的可以做到，那么下一个目标也不远了吧。</p>
+<h2 id="-">波澜不惊</h2>
+<p>这个大会的组织还是非常好的，中途换了酒店反而对我更方便了，走路就可以到达。第一场分享，来自淘宝的“前端技术在电子商务领域的应用与实践”，感觉像是在给淘宝的装修大市场打广告，淘宝作为主办方，这样做也无可厚非，但是，作为一届技术大会，不谈技术占我们那么多时间就不地道了。最后一场来自淘宝<a href="http://www.d2forum.org/d2/5/guest.html#yubo" target="_blank">玉伯</a>的“面向未来的前端类库开发”，感觉kissy还是缺少一些技术含量，至少没有达到前沿水平，与谷歌，fb等比起来，无法我们坐着的听人们目瞪口呆，而且，玉伯的表达能力有待增强。最后的分享环节中，淘宝渡劫和来人人网的俩分享反而不如前面那些无名人士的效果，可有可无吧。</p>
+<h2 id="-">波涛汹涌</h2>
+<p>大会总是有不少让所有人为之动容之处。首先是<a href="http://www.d2forum.org/d2/5/guest.html" target="_blank">Hedger</a>的讲演，很有大师的感觉，无处不发散着来自世界最优秀团队的一种hack气质。<a href="http://www.d2forum.org/d2/5/guest.html" target="_blank">Hedger</a>首先提出js中的很多问题，然后一一批评了那些世界顶级大师John Resig（jquery作者）和<a href="http://dancewithnet.com/2009/03/29/douglas-crockford/" target="_blank">Douglas Crockford</a>的一些在业界被广为流传，并且大量使用的一些方法。用<a href="http://www.d2forum.org/d2/5/guest.html" target="_blank">Hedger</a>来说，这些都是js中的奇技淫巧<strong>，</strong>我们每个人都是忍者（或者说侠客），缺乏一种统一的模式。jQuery和YUI的比较是没有意义的，他们都是把性能的代价放到了客户端，让用户的电脑来解决js中的问题。</p>
+<p>这在我们一般的思维来说，完全没有问题，客户端浏览器运行js，我们在js的范围内开发，但是我们无法预料客户端的浏览器是哪种浏览器，这样就只能做浏览器兼容了，然后出现了无数伟大的js库，然后我们来讨论怎么做一个更好的库吧，jQuery or mootool or YUI Dojo Ext……淘宝说，我们要开发一个适合我们自己的库kissy。这样的思维似乎还无漏洞，淘宝在国内是走在前列。</p>
+<p>这样，我们都是在js的范围内思考，那么会上有个90后小伙就问了，你们面对这样一个又一个的括号，你们难道不烦吗？呵呵，一语既出，雷到全场(主持人乌龙表示压力很大)，难道js不是这样写的吗？小伙说，我自己重新编译了js，然后刷刷写代码了，小家伙的思维确实很奇特，不过他应该没过大二吧，在大学的殿堂里慢慢研究吧，会有出息的。用于实际就有些过了(CoffeeScript和underscore的出现，说明，再好的想法只有实现了才能有用，我们还是应该多干活，少说话，把产品做好了才是王道)。</p>
+<p><a href="http://dancewithnet.com/2009/03/29/douglas-crockford/" target="_blank">Douglas Crockford</a>在99年为js辩护，称JavaScript曾是“世界上最被误解的语言”，大师一言既出，立即在整个前端界内把js语言翻身为优雅的函数式语言。John Resig大神开发jQuery，更是让无数前端小子感受到js语言本身的独特魅力。就这样，在业界形成了一种共识：JavaScript有其独特的原形继承语言，它的语言中有很多优雅的特性，我们应该尽量避免使用语言中的鸡肋部分，总体上JavaScript是这一门非常优秀的语言。无形中，js带上一顶神圣的光环，90后小家伙居然说重新编译一门语言，这不是讨打么。</p>
+<p>但90后前面有<a href="http://www.d2forum.org/d2/5/guest.html" target="_blank">Hedger</a>的演讲谈<a href="http://code.google.com/intl/zh-CN/closure/compiler/" target="_blank">Closure Compiler</a>，其实谷歌在09年就已经开始尝试从编译的角度重新构造js了，<a href="http://code.google.com/intl/zh-CN/closure/compiler/" target="_blank">Closure Compiler</a>的基本思想是：让客户端的js只运行所需要的部分。谷歌的实现是通过<a href="http://code.google.com/intl/zh-CN/closure/compiler/" target="_blank">Closure Compiler</a>工具对js进行重新编译，把js按照一种严格的模式在服务器端首先编译好一份最简单的js文件。这种事情该是多么复杂啊，也只有大神谷歌能这样做吧，也只有谷歌对性内的极限性内要求才有如此需求。这样既不需要修改js语言，又可以以一种非常规范的模式编写js代码，这样的js代码规范在大型项目中非常有用。<a href="http://www.d2forum.org/d2/5/guest.html" target="_blank">Hedger</a>说谷歌的<a href="http://code.google.com/intl/zh-CN/closure/compiler/" target="_blank">Closure </a>库可以自动生成说明文档，这应该与zend frameworks是一样的，否则zend哪有时间写一千多页的api文档，代码及时文档。</p>
+<p>最后需要谈谈<a href="http://blog.zhaojie.me/" target="_blank">老赵</a>，他的思想和谷歌的<a href="http://code.google.com/intl/zh-CN/closure/compiler/" target="_blank">Closure Compiler</a>有相似之处，只是相对而言，<a href="http://code.google.com/intl/zh-CN/closure/compiler/" target="_blank">Closure Compiler</a>更加复杂而已。老赵的<a href="http://github.com/JeffreyZhao/jscex" target="_blank">Jscex</a>则是用js语言来改变语言运行的模式，老赵来自盛大，当然专注于游戏行业了，<a href="http://https//github.com/JeffreyZhao/jscex" target="_blank">Jscex</a>对于js游戏开发是一个无比强大的工具。js的异步事件模型是js语言的一个强大的特性，客户端程序通常都是基础事件操作。但是异步事件在一次又一次的循环中（游戏开发中），任何人都只能望洋兴叹了，这一个事件接着一个事件，程序员很快会失去自我。不过，不能不说，Jscex也失去了JavaScript强大的事件驱动，Node.js最大特色之一就是无阻塞的异步执行，也正是建立在事件驱动之上。</p>
+<p>在PHP的开发中，我们都被教导，不要使用goto，突然把程序断了，程序员会失去对程序的控制的。但是，js的每一个事件就是一个goto模块，当然，这在模型事件很少的时候我们还能控制场面，但是，面对动画，这一切就无能为力了。动画每隔200毫秒需要一个状态，那每一个状态的变化都需要一个函数，这样需要处理的事件就太多了。这时候flash的时间线反而更有用，<a href="http://github.com/JeffreyZhao/jscex" target="_blank">Jscex</a>使用一个函数来处理一步处理过程，这样，我们就可以像处理一条流水线一样处理动画了。</p>
+<p>老赵只用了十分钟，就把全场震撼住了，老赵的语言能以也非常强悍。</p>
+<h2 id="-">总结</h2>
+<p>会场分两个场，只能呆在一个场，有些遗憾，希望有视频上传。</p>
+<p>对于大会的主办方，淘宝要加油才行，虽然淘宝的技术很先进，但还没有达到可以show的前沿水平(Facebook,Twitter,Google级别)，不过淘宝推荐行业发展的精神是非常值得赞赏的。</p>
+<p>最后，语言都有其适用的范围，谷歌做谷歌的大型应用，淘宝要重用UI做各种奇形怪状的页面，盛大做游戏，90后幻想就行了。一句话，以用户为中心，以实践为引导。JavaScript已经到了一个需要超越web的时代了，走出浏览器，走向更广泛的空间。</p>
+<h2 id="-">扩展</h2>
+<ol>
+<li><a href="http://www.d2forum.org/d2/5/guest.html" target="_blank">Hedger</a>的<a href="http://calendar.perfplanet.com/2010/coding-better-object-oriented-javascript-with-closure-compiler/" title="Permanent Link to Coding Better Object-Oriented JavaScript with Closure Compiler" target="_blank">Coding Better Object-Oriented JavaScript with Closure Compiler</a></li>
+<li><a href="http://www.limboy.com/2010/12/19/module-and-compiler-for-common-js/" title="通用JS时代的模块机制和编译工具" target="_blank">通用JS时代的模块机制和编译工具</a></li>
+<li><a href="http://blog.zhaojie.me/2010/12/animations-and-games-based-on-jscex-async.html" target="_blank">基于Jscex.Async的JavaScript动画/游戏</a></li>
+</ol>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/d2/" class="post__tag__link">d2</a></li><li class="post__tag__item"><a href="/tags/前端/" class="post__tag__link">前端</a></li></ul><a href="/2010/12/19/d2-some-feeling/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><span title="Previous" class="page-menu__link icon-arrow-left page-menu__link--disabled"></span></li><li class="page-menu__item"><span title="Next" class="page-menu__link icon-arrow-right page-menu__link--disabled"></span></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
+(document,"script","shepherdwind","count");
+</script>

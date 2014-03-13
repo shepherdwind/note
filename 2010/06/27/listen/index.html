@@ -1,0 +1,59 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>使用php获得听力光盘中需要考试的类容 - shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2010-06-27T00:17:07.000Z" class="post__time">June 27, 2010</time><h1 class="post__title"><a href="/2010/06/27/listen/">使用php获得听力光盘中需要考试的类容</a></h1></header><div class="post__main"><p>都大三了，还要考听力，是在汗颜啊。作为东师人，大家都知道，听力考试只需要背诵那么几部分，而那基本分的听力都全部在光盘中snd文件夹中，wma格式，OK，那个软件太bt——每次都把电脑分辨率调到800px，都什么时代了，而且看电脑挺太磨叽。直接拷贝出音频还可以在p3上听。</p>
+<p>任务就这样了，作为一个程序员有一个基本素质是：不做重复的工作——那是电脑的任务（vim创始人之语）。10个单元的题目，怎么把它拷贝出来呢？
+首先，把第一单元的听力考出来，放到文件夹“听力”中，一共8个文件，文件名分别是</p>
+<ol>
+<li>u01LIT1f.wav</li>
+<li>u01LIT2f.wav</li>
+<li>u01LIT3f.wav</li>
+<li>u01LSD01f.wav</li>
+<li>u01LSD02f.wav</li>
+<li>u01LSD03f.wav… (1到5)</li>
+</ol>
+<p>然后写一个php脚本：</p>
+<figure class="highlight"><pre>define(<span class="string">'SOURSES'</span>,<span class="string">'G:/snd/'</span>);
+
+<span class="keyword">for</span>(<span class="variable">$i</span>=<span class="number">6</span>;<span class="variable">$i</span>&amp;lt;=<span class="number">10</span>;<span class="variable">$i</span>++)
+{
+    <span class="keyword">for</span>(<span class="variable">$j</span>=<span class="number">1</span>;<span class="variable">$j</span>&amp;lt;=<span class="number">3</span>;<span class="variable">$j</span>++)
+    {
+        <span class="keyword">if</span>(<span class="variable">$i</span>==<span class="number">10</span>)
+        {
+            <span class="variable">$filename</span> = <span class="string">'u'</span>. <span class="variable">$i</span> .<span class="string">'LIT'</span>. <span class="variable">$j</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="keyword">else</span>
+        {
+            <span class="variable">$filename</span> = <span class="string">'u0'</span>. <span class="variable">$i</span> .<span class="string">'LIT'</span>. <span class="variable">$j</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="variable">$p</span> = <span class="keyword">fopen</span>(<span class="variable">$filename</span>,<span class="string">'w+'</span>);
+        copy(SOURSES.<span class="variable">$filename</span>,<span class="variable">$filename</span>);
+        <span class="keyword">fclose</span>(<span class="variable">$p</span>);
+    }
+
+    <span class="keyword">for</span>(<span class="variable">$k</span> = <span class="number">1</span>;<span class="variable">$k</span>&amp;lt;=<span class="number">5</span>;<span class="variable">$k</span>++)
+    {
+        <span class="keyword">if</span>(<span class="variable">$i</span>==<span class="number">10</span>)
+        {
+            <span class="variable">$filename</span> = <span class="string">'u'</span>. <span class="variable">$i</span> .<span class="string">'LSD0'</span>. <span class="variable">$k</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="keyword">else</span>
+        {
+            <span class="variable">$filename</span> = <span class="string">'u0'</span>. <span class="variable">$i</span> .<span class="string">'LIT'</span>. <span class="variable">$j</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="variable">$p</span> = <span class="keyword">fopen</span>(<span class="variable">$filename</span>,<span class="string">'w+'</span>);
+        copy(SOURSES.<span class="variable">$filename</span>,<span class="variable">$filename</span>);
+        <span class="keyword">fclose</span>(<span class="variable">$p</span>);
+    }
+}
+</pre></figure>
+
+<p>Ok，在建立一个a.bat文件输入：</p>
+<figure class="highlight"><pre><span class="variable">$ </span>php a.php
+</pre></figure>
+
+<p>a.php是php文件名，把这两个文件放在最初建立的‘听力’文件夹中，双击 a.bat就可以啦。那个php代码非常简单，只使用了一个copy函数，基本会英语的人就能看明白什么意思
+注：前提是在个人电脑上安装好了 php。当然也可以使用其他语言，但是作为phper，也应该多尝试尝试php的各种功能，还是很有用的</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li></ul><a href="/2010/06/27/listen/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><div class="comments"><div id="disqus_thread"><noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
+</noscript></div></div></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><a title="Previous" href="/2010/07/07/flowing-wild/" class="page-menu__link icon-arrow-left"></a></li><li class="page-menu__item"><a title="Next" href="/2010/04/25/webshell/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
+(document,"script","shepherdwind","embed");
+</script>

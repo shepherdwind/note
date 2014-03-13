@@ -1,0 +1,520 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>php探索 - shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2010-07-16T07:30:52.000Z" class="post__time">July 16, 2010</time><h1 class="post__title"><a href="/2010/07/16/hierarchical-data-show-in-html/">树结构数据的html展示实现</a></h1></header><div class="post__main"><p>网页中经常会需要展示一些树结构数据，而现在流行的关系型数据库（比如MySQL）都是以二位的数据形式贮存，对于通常用到的树结构需要转化为二维关系来放在数据库中。关于树结构数据的贮存，Mike Hillyer一文<a href="http://dev.mysql.com/tech-resources/articles/hierarchical-data.html" target="_blank">Managing Hierarchical Data in MySQL</a>有非常详细的描述。</p>
+<p>Mike Hillyer提出两种方式：</p>
+<p>1、毗邻目录模式(adjacency list model)</p>
+<p>2、预排序遍历树算法(modified preorder tree traversal algorithm)</p>
+<p>虽然两种方式很好地实现了数据存储过程，但网页显示还需要做得更多。本文仅仅探讨树结构数据的展示部分。</p>
+<p>Mike Hillyer的两种模式中，第二种是直接把数据的结构关系转存起来，数据的展示不存在问题（具体细节参考原文）。第一数据结构的存在更容易理解，所以似乎被更多人采用。这种方法的原理是把每个数与其父节点数据的一个标识符一起贮存在一列中，然后就像摸着石子过河一样，找到一个点然后可以得到前一个点（或者后一个点），然后所有的点就都可以穿在一起了。这种方法有些数学中数学归纳法的意味，它的好处在于存储数据时非常清晰——只需要处理数据本身和父节点的关系，而且可扩展性好，数据所处理的关系越少，这大概就是软件所强调的松耦合思想吧。当然这种方法的代价是低效率的查询，通常无法确定整个树的深度，这就需要使用递归查询来获得数据，递归查询数据库对于系统资源的消耗是非常巨大的。此外还有一个致命的缺陷，修改数据时容易出现节点闭合的情况，也就是这些数据围成了一个圈，如下图所示</p>
+<figure class="highlight text"><pre><span class="comment">1</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">&gt;2</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">&gt;4</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">&gt;5</span>
+<span class="comment">|</span>                    <span class="comment">|</span>
+<span class="comment">1&lt;</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">8&lt;</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">7&lt;</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">6</span>
+</pre></figure>
+
+<p>1后面的自带元素永远不知道它们起源于1整个节点，一旦出现这种情况就会到时递归查询进入死循环，所以存储过程一定要对数据进行合理性检验（就像结婚需要避免血缘关系）。当然在做中小型网站时，这种方法还是非常好的，而且在数据变换不是很大时可以使用缓存来解决循环查询的问题。</p>
+<p>在生产html展示页时，首先要完成的是从数据库中提取数据，并且转换为树结构。假设有如下数据：</p>
+<figure class="highlight"><pre><span class="code">+-------------+</span>----------------------<span class="code">+--------+</span>
+<span class="header">|          id | name                 | parent |
++-------------+----------------------+--------+</span>
+|           1 | 1                    |      0 |
+|           2 | 2                    |      0 |
+|           3 | 3                    |      0 |
+|           4 | 4                    |      2 |
+|           5 | 5                    |      2 |
+|           6 | 6                    |      3 |
+|           7 | 7                    |      3 |
+|           8 | 8                    |      6 |
+<span class="header">|           9 | 9                    |      6 |
++-------------+----------------------+--------+</span>
+</pre></figure>
+
+<p>第一列id为一组数据的标识。用集合来描述这列数据是{1,2{4,5},3{6{8,9},7}},如下图：</p>
+<p><img src="http://www.shepherdwind.com/wp-content/uploads/2010/07/2010-07-16_135618.jpg" alt="树结构图" title="树结构图"></p>
+<p>如果上图依次标上数字，就成为了预排序遍历树算法模式的贮存了，看到如此结构自然想到用在PHP中可以使用如此数组来表示</p>
+<figure class="highlight"><pre><span class="keyword">array</span>(<span class="number">1</span>,<span class="number">2</span>,<span class="keyword">array</span>(<span class="number">4</span>,<span class="number">5</span>),<span class="number">3</span>,<span class="keyword">array</span>(<span class="number">6</span>,<span class="keyword">array</span>(<span class="number">8</span>,<span class="number">9</span>),<span class="number">7</span>));
+</pre></figure>
+
+<p>于是尝试了一下如下的测试</p>
+<figure class="highlight"><pre><span class="function"><span class="keyword">function</span> <span class="title">unlimitedSortTest</span><span class="params">()</span>
+{</span>
+    <span class="variable">$arrSort</span> = <span class="keyword">array</span>(
+        <span class="keyword">array</span>(<span class="number">1</span>,<span class="number">0</span>),
+        <span class="keyword">array</span>(<span class="number">2</span>,<span class="number">0</span>),
+        <span class="keyword">array</span>(<span class="number">3</span>,<span class="number">0</span>),
+        <span class="keyword">array</span>(<span class="number">4</span>,<span class="number">2</span>),
+        <span class="keyword">array</span>(<span class="number">5</span>,<span class="number">2</span>),
+        <span class="keyword">array</span>(<span class="number">6</span>,<span class="number">3</span>),
+        <span class="keyword">array</span>(<span class="number">7</span>,<span class="number">3</span>),
+        <span class="keyword">array</span>(<span class="number">8</span>,<span class="number">6</span>),
+        <span class="keyword">array</span>(<span class="number">9</span>,<span class="number">6</span>)
+    );
+    <span class="variable">$arrResult</span> = <span class="keyword">array</span>(
+        <span class="number">1</span>,<span class="number">2</span>,<span class="keyword">array</span>(<span class="number">4</span>,<span class="number">5</span>),<span class="number">3</span>,<span class="keyword">array</span>(<span class="number">6</span>,<span class="keyword">array</span>(<span class="number">8</span>,<span class="number">9</span>),<span class="number">7</span>)
+    );
+    <span class="variable">$this</span>-&gt;unit-&gt;run(<span class="variable">$this</span>-&gt;_listToTree(<span class="variable">$arrSort</span>),<span class="variable">$arrResult</span>,<span class="string">'分类数据生成测试'</span>);
+}
+</pre></figure>
+
+<p>依然是使用CI的单元测试类，实现如此算法甚是折腾，一共使用了三个函数，一个作为借口函数调入数据，一个函数通过递归方式遍历所有节点，把数据与数据的深度标识依次存入一个数组中，最后一个函数获取子节点的元素，如果子节点函数返回书为空，递归循环退出。这种方式实现得非常简陋，于数据库结合，需要首先把数据库数据直接提取，然后存入一个数组。事实上，这返回的数据也无法得到上面测试想要得到的结果，数据的展示只需要可以明显看出数据之间的继承关系就可以。最后得到一个如下图的options</p>
+<select  name="tests">
+<option value="0">1</option>
+<option value="10">　11</option>
+<option value="11">　12</option>
+<option value="20">　　21</option>
+<option value="30">　　　31</option>
+<option value="40">　　　　41</option>
+<option value="41">　　　　42</option>
+<option value="42">　　　　43</option>
+<option value="32">　　　32</option>
+<option value="33">　　　33</option>
+<option value="34">　　　34</option>
+<option value="22">　　22</option>
+<option value="23">　　23</option>
+<option value="13">　13</option>
+<option value="14">　14</option>
+<option value="2">2</option>
+<option value="3">3</option>
+<option value="4">4</option>
+</select>
+
+<p>使用空白缩进深度作为树结构的描述方式，看来还是非常不爽，展示得毕竟非常勉强。后来无意中看到另外一种更合适的，真正的树结构：</p>
+<select id="role_parents" class="valid" name="role_parents"> <option disabled="disabled" selected="selected" value="label">父级组</option> <option value="网站管理员">网站管理员</option> <option value="测试者11"> ├ 测试者11</option> <option value="测试者21"> ├ 测试者21</option> <option value="测试者2"> │ └ 测试者2</option> <option value="测试者32"> ├ 测试者32</option> <option value="测试者12"> │ ├ 测试者12</option> <option value="测试者1"> │ └ 测试者1</option> <option value="测试者"> └ 测试者</option> </select>
+
+<p>于是又探索起来这种形式的生成过程。最终还是使用了循环查询方法，并且实现了从任意节点获取树的方法getTree，并且还有一个比较关系是否合适的函数_notChildOf。这里只有一个属性db为继承自CI的Model类，转换为其他数据库操作类也非常容易。Ok，就这样啦，最后，除了可以生成上面的选择器，还可以借助比如jQuery的table-tree插件，生成表格数据的树结构。上面Category类中，getTree函数得到的数组中，数组key值就是用来表示数据在整个书中的关系(密码在getChild中的$j中)。</p>
+<figure class="highlight"><pre><span class="comment">/**
+ *
+ * 分类模型父类
+ * 在数据库中结构为
+ * id       childName       parentName
+ * -----------------------------------
+ *  1       栏目1           root
+ *  2       栏目2           栏目1
+ *
+ */</span>
+
+<span class="class"><span class="keyword">class</span> <span class="title">CategoryModel</span> <span class="keyword">extends</span> <span class="title">Model</span>{</span>
+
+    <span class="comment">/**
+     *
+     * 父节点名，对应为数据库中字段
+     *
+     *<span class="phpdoc"> @var</span> string
+     */</span>
+    <span class="keyword">protected</span> <span class="variable">$_parent</span>;
+
+    <span class="comment">/**
+     *
+     * 子节点名，对应为数据库中字段
+     *
+     *<span class="phpdoc"> @var</span> string
+     */</span>
+    <span class="keyword">protected</span> <span class="variable">$_child</span>;
+
+    <span class="comment">/**
+     *
+     * 更节点名
+     *
+     *<span class="phpdoc"> @var</span> string
+     */</span>
+    <span class="keyword">protected</span> <span class="variable">$_root</span>;
+
+    <span class="comment">//整体树结构缓存</span>
+    <span class="keyword">protected</span> <span class="variable">$_tree</span>;
+
+    <span class="keyword">public</span> <span class="variable">$table</span>;
+
+    <span class="comment">/**
+     *
+     * 重载Datamapper构造函数
+     *
+     */</span>
+    <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">()</span>
+    {</span>
+        <span class="keyword">parent</span>::__construct();
+    }
+
+    <span class="comment">/**
+     *
+     * 获取树结构，以数组形式展现
+     *<span class="phpdoc"> @param</span> $root string 树起点名
+     *<span class="phpdoc"> @return</span> array
+     */</span>
+    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">getTree</span><span class="params">(<span class="variable">$root</span> = NULL)</span>
+    {</span>
+        <span class="variable">$tree</span> = <span class="variable">$this</span>-&gt;getChild(<span class="variable">$root</span>);
+        <span class="variable">$treeNode</span> = <span class="keyword">array</span>();
+
+        <span class="keyword">if</span>(!<span class="keyword">empty</span>(<span class="variable">$tree</span>))
+        {
+            <span class="variable">$parents</span> = array_keys(<span class="variable">$tree</span>);
+            <span class="variable">$children</span> = array_values(<span class="variable">$tree</span>);
+
+            <span class="keyword">foreach</span>(<span class="variable">$children</span> <span class="keyword">as</span> <span class="variable">$key</span> =&gt; <span class="variable">$child</span>)
+            {
+                <span class="variable">$parent</span> = explode(<span class="string">'-'</span>,<span class="variable">$parents</span>[<span class="variable">$key</span>]);
+                <span class="variable">$parentNext</span> = <span class="keyword">isset</span>(<span class="variable">$parents</span>[<span class="variable">$key</span> + <span class="number">1</span>])?explode(<span class="string">'-'</span>,<span class="variable">$parents</span>[<span class="variable">$key</span>+<span class="number">1</span>]):<span class="keyword">NULL</span>;
+                <span class="variable">$level</span> = <span class="variable">$parent</span>[<span class="number">1</span>];
+                <span class="variable">$levelNext</span> = <span class="variable">$parentNext</span> ? <span class="variable">$parentNext</span>[<span class="number">1</span>]:<span class="keyword">NULL</span>;
+
+                <span class="keyword">if</span>(<span class="variable">$level</span> == <span class="number">0</span>)
+                {
+                    <span class="variable">$treeNode</span>[<span class="variable">$child</span>] = <span class="variable">$child</span>;
+                }
+                <span class="keyword">elseif</span>(<span class="variable">$level</span> &gt; <span class="number">0</span> <span class="keyword">AND</span> <span class="variable">$levelNext</span> <span class="keyword">AND</span> <span class="variable">$levelNext</span> &gt;= <span class="variable">$level</span>)
+                {
+                    <span class="variable">$treeNode</span>[<span class="variable">$child</span>] = <span class="string">'&amp;nbsp;'</span>.str_repeat(<span class="string">'│&amp;nbsp;'</span>,<span class="variable">$level</span>-<span class="number">1</span>).<span class="string">'├&amp;nbsp;'</span>.<span class="variable">$child</span>;
+                }
+                <span class="keyword">else</span>
+                {
+                    <span class="variable">$treeNode</span>[<span class="variable">$child</span>] = <span class="string">'&amp;nbsp;'</span>.str_repeat(<span class="string">'│&amp;nbsp;'</span>,<span class="variable">$level</span>-<span class="number">1</span>).<span class="string">'└&amp;nbsp;'</span>.<span class="variable">$child</span>;
+                }
+            }
+        }
+
+        <span class="keyword">return</span> <span class="variable">$treeNode</span>;
+    }
+
+    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">getParent</span><span class="params">(<span class="variable">$target</span> = <span class="string">''</span>,&amp;<span class="variable">$nodeTree</span> = array<span class="params">()</span>)</span>
+    {</span>
+        <span class="keyword">if</span>(<span class="variable">$target</span> == <span class="variable">$this</span>-&gt;_root)
+        {
+            <span class="variable">$nodeTree</span>[] = <span class="variable">$target</span>;
+        }
+        <span class="keyword">else</span>
+        {
+            <span class="variable">$this</span>-&gt;db-&gt;select(<span class="variable">$this</span>-&gt;_parent.<span class="string">','</span>.<span class="variable">$this</span>-&gt;_child);
+
+            <span class="variable">$query</span> = <span class="variable">$this</span>-&gt;db-&gt;where(<span class="variable">$this</span>-&gt;_child,<span class="variable">$target</span>)-&gt;get(<span class="variable">$this</span>-&gt;table);
+            <span class="keyword">if</span>(<span class="variable">$query</span>-&gt;num_rows() &gt; <span class="number">0</span>)
+            {
+                <span class="variable">$row</span> = <span class="variable">$query</span>-&gt;row();
+                <span class="variable">$nodeTree</span>[] = <span class="variable">$target</span>;
+                <span class="variable">$this</span>-&gt;getParent(<span class="variable">$row</span>-&gt;{<span class="variable">$this</span>-&gt;_parent},&amp;<span class="variable">$nodeTree</span>);
+            }
+        }
+
+        <span class="keyword">return</span> <span class="variable">$nodeTree</span>;
+    }
+
+    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">getChild</span><span class="params">(<span class="variable">$target</span> = NULL, &amp;<span class="variable">$nodeTree</span> = array<span class="params">()</span>,&amp;<span class="variable">$j</span> = -<span class="number">1</span>)</span>
+    {</span>
+        <span class="variable">$target</span> = ! <span class="variable">$target</span>?<span class="variable">$this</span>-&gt;_root:<span class="variable">$target</span>;
+
+        <span class="variable">$this</span>-&gt;select(<span class="variable">$this</span>-&gt;table.<span class="string">'.'</span>.<span class="variable">$this</span>-&gt;_parent.<span class="string">','</span>.<span class="variable">$this</span>-&gt;table.<span class="string">'.'</span>.<span class="variable">$this</span>-&gt;_child);
+
+        <span class="variable">$query</span> = <span class="variable">$this</span>-&gt;db-&gt;where(<span class="variable">$this</span>-&gt;table.<span class="string">'.'</span>.<span class="variable">$this</span>-&gt;_parent,<span class="variable">$target</span>)-&gt;get(<span class="variable">$this</span>-&gt;table);
+
+        <span class="keyword">if</span>(<span class="variable">$query</span>-&gt;num_rows &gt; <span class="number">0</span>)
+        {
+            <span class="comment">//$i的作用仅仅在于为每一个child提供不同的parent键值</span>
+            <span class="variable">$i</span> = <span class="number">1</span>;
+            <span class="keyword">foreach</span>(<span class="variable">$query</span>-&gt;result() <span class="keyword">as</span> <span class="variable">$childSlibing</span>)
+            {
+                <span class="variable">$searchNode</span> = <span class="variable">$childSlibing</span>-&gt;{<span class="variable">$this</span>-&gt;_child};
+                <span class="variable">$j</span>++;
+
+                <span class="variable">$nodeTree</span>[<span class="variable">$target</span>.<span class="string">'-'</span>.<span class="variable">$j</span>.<span class="string">'-'</span>.<span class="variable">$i</span>] = <span class="variable">$searchNode</span>;
+
+                <span class="variable">$this</span>-&gt;getChild(<span class="variable">$has_maney</span>,<span class="variable">$searchNode</span>,&amp;<span class="variable">$nodeTree</span>,&amp;<span class="variable">$j</span>);
+
+                <span class="variable">$j</span>--;
+                <span class="variable">$i</span>++;
+            }
+        }
+
+        <span class="keyword">return</span> <span class="variable">$nodeTree</span>;
+    }
+
+    <span class="comment">/**
+     *
+     * 判断两者是否相互包涵，即规定改变
+     */</span>
+    <span class="keyword">protected</span> <span class="function"><span class="keyword">function</span> <span class="title">_notChildOf</span><span class="params">(<span class="variable">$field</span>)</span>
+    {</span>
+        <span class="keyword">if</span>(<span class="keyword">empty</span>(<span class="variable">$this</span>-&gt;{<span class="variable">$field</span>}))
+        {
+            <span class="keyword">return</span> <span class="keyword">FALSE</span>;
+        }
+        <span class="keyword">else</span>
+        {
+            <span class="variable">$parents</span> = <span class="variable">$this</span>-&gt;getParent(<span class="variable">$this</span>-&gt;{<span class="variable">$field</span>});
+            <span class="keyword">if</span>(in_array(<span class="variable">$this</span>-&gt;{<span class="variable">$this</span>-&gt;_child},<span class="variable">$parents</span>))
+            {
+                <span class="keyword">return</span> <span class="keyword">FALSE</span>;
+            }
+            <span class="keyword">else</span>
+            {
+                <span class="keyword">return</span> <span class="keyword">TRUE</span>;
+            }
+
+        }
+    }
+}
+</pre></figure>
+
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li></ul><a href="/2010/07/16/hierarchical-data-show-in-html/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-07-15T02:10:58.000Z" class="post__time">July 15, 2010</time><h1 class="post__title"><a href="/2010/07/15/test-of-array_key_exists-vs-isset/">isset和array_key_exists的比较测试</a></h1></header><div class="post__main"><p>经常使用isset和array_key_exists测试数组中的变量是否存在，然后忽然很想知道到底两者有什么区别，然后百度了一下，有说 array_key_exists<a href="www.laohucheng.com/post/122/">更快</a>的，也用说isset更快的，当然似乎更多人建议 isset。</p>
+<p>于是自己做了一个测试，比较一下两者的差异：注，本文最初发在<a href="http://codeigniter.org.cn/forums/thread-5991-1-1.html" target="_blank">ci论坛</a></p>
+<p>结果大致如下：</p>
+<p>当数组个数为10时，两者差异就体现出来了——isset速度要快近10倍，但不是很明显，而且对于变量是否存在，两者之间的差异没有太大，当变量存在时运行更快，但是这种趋势在是非常微弱的。使用 array_key_exists随着循环的次数增加，程序运行的时间增加量是成几何级数增加的，当一个数组元素个数超过 1000时运行速度就非常慢了。</p>
+<p>最后总结如下：</p>
+<p>1、isset和array_key_exists在对判断一个数组函数中某个元素是否存在，isset速度要更快，而且这 种速度差异是非常大的</p>
+<p>2、isset属于php中的语言结构，而后者是函数，所以前者更快，isset不可 以用于可变函数</p>
+<p>3、对于变量值的判断，当变量为NULL时，isset返回的结果是false，而后者只判断变量是否存在。所以如果判断一个数组中的某个 元素，并且判断其是否是否为真，应该用isset</p>
+<p>4、isset属于php特定语言结构，后者在其他语言中也存在，更具可读性</p>
+<p>具体测试过程，使用<a href="http://codeigniter.org.cn" target="_blank">ci</a>基准测试类测试</p>
+<figure class="highlight"><pre>    function issetVsArray()
+    {
+        <span class="variable">$loop</span> = <span class="number">10</span>;
+
+        <span class="variable">$test</span> = array();
+        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span> &<span class="keyword">lt</span>;= <span class="variable">$loop</span>; <span class="variable">$i</span>++)
+        {
+            <span class="variable">$test</span>[<span class="string">'test'</span>.<span class="variable">$i</span>] = <span class="variable">$i</span>;
+        }
+
+        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'issetAllFalse'</span>);
+
+        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
+        {
+            isset(<span class="variable">$test</span>[<span class="string">'t'</span>.<span class="variable">$i</span>]);
+        }
+        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'arraysAllFalse'</span>);
+        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
+        {
+            array_key_exists(<span class="string">'t'</span>.<span class="variable">$i</span>,<span class="variable">$test</span>);
+        }
+
+        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'issetAllTrue'</span>);
+        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
+        {
+            isset(<span class="variable">$test</span>[<span class="string">'test'</span>.<span class="variable">$i</span>]);
+        }
+        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'arraysAllTrue'</span>);
+        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
+        {
+            array_key_exists(<span class="string">'test'</span>.<span class="variable">$i</span>,<span class="variable">$test</span>);
+        }
+        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'end'</span>);
+
+        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'issetAllFalse'</span>,<span class="string">'arraysAllFalse'</span>).<span class="string">'&lt;br /&gt;'</span>;
+        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'arraysAllFalse'</span>,<span class="string">'issetAllTrue'</span>).<span class="string">'&lt;br /&gt;'</span>;
+        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'issetAllTrue'</span>,<span class="string">'arraysAllTrue'</span>).<span class="string">'&lt;br /&gt;'</span>;
+        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'arraysAllTrue'</span>,<span class="string">'end'</span>).<span class="string">'&lt;br /&gt;'</span>;
+    }
+</pre></figure>
+
+<p>几次测试结果：</p>
+<figure class="highlight"><pre>循环<span class="number">10</span>次，<span class="variable">$loop</span>=<span class="number">10</span>
+<span class="number">0.0001</span>
+<span class="number">0.0009</span>
+<span class="number">0.0001</span>
+<span class="number">0.0007</span>
+
+循环<span class="number">100</span>次，<span class="variable">$loop</span>=<span class="number">100</span>
+<span class="number">0.0003</span>
+<span class="number">0.0185</span>
+<span class="number">0.0003</span>
+<span class="number">0.0189</span>
+
+循环<span class="number">1000</span>次，<span class="variable">$loop</span>=<span class="number">1000</span>
+<span class="number">0.0015</span>
+<span class="number">0.2831</span>
+<span class="number">0.0020</span>
+<span class="number">0.2839</span>
+
+循环<span class="number">10000</span>次，<span class="variable">$loop</span>=<span class="number">10000</span>
+<span class="number">0.0157</span>
+<span class="number">8.4764</span>
+<span class="number">0.0164</span>
+<span class="number">8.4101</span>
+</pre></figure>
+
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li></ul><a href="/2010/07/15/test-of-array_key_exists-vs-isset/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-06-27T00:17:07.000Z" class="post__time">June 27, 2010</time><h1 class="post__title"><a href="/2010/06/27/listen/">使用php获得听力光盘中需要考试的类容</a></h1></header><div class="post__main"><p>都大三了，还要考听力，是在汗颜啊。作为东师人，大家都知道，听力考试只需要背诵那么几部分，而那基本分的听力都全部在光盘中snd文件夹中，wma格式，OK，那个软件太bt——每次都把电脑分辨率调到800px，都什么时代了，而且看电脑挺太磨叽。直接拷贝出音频还可以在p3上听。</p>
+<p>任务就这样了，作为一个程序员有一个基本素质是：不做重复的工作——那是电脑的任务（vim创始人之语）。10个单元的题目，怎么把它拷贝出来呢？
+首先，把第一单元的听力考出来，放到文件夹“听力”中，一共8个文件，文件名分别是</p>
+<ol>
+<li>u01LIT1f.wav</li>
+<li>u01LIT2f.wav</li>
+<li>u01LIT3f.wav</li>
+<li>u01LSD01f.wav</li>
+<li>u01LSD02f.wav</li>
+<li>u01LSD03f.wav… (1到5)</li>
+</ol>
+<p>然后写一个php脚本：</p>
+<figure class="highlight"><pre>define(<span class="string">'SOURSES'</span>,<span class="string">'G:/snd/'</span>);
+
+<span class="keyword">for</span>(<span class="variable">$i</span>=<span class="number">6</span>;<span class="variable">$i</span>&amp;lt;=<span class="number">10</span>;<span class="variable">$i</span>++)
+{
+    <span class="keyword">for</span>(<span class="variable">$j</span>=<span class="number">1</span>;<span class="variable">$j</span>&amp;lt;=<span class="number">3</span>;<span class="variable">$j</span>++)
+    {
+        <span class="keyword">if</span>(<span class="variable">$i</span>==<span class="number">10</span>)
+        {
+            <span class="variable">$filename</span> = <span class="string">'u'</span>. <span class="variable">$i</span> .<span class="string">'LIT'</span>. <span class="variable">$j</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="keyword">else</span>
+        {
+            <span class="variable">$filename</span> = <span class="string">'u0'</span>. <span class="variable">$i</span> .<span class="string">'LIT'</span>. <span class="variable">$j</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="variable">$p</span> = <span class="keyword">fopen</span>(<span class="variable">$filename</span>,<span class="string">'w+'</span>);
+        copy(SOURSES.<span class="variable">$filename</span>,<span class="variable">$filename</span>);
+        <span class="keyword">fclose</span>(<span class="variable">$p</span>);
+    }
+
+    <span class="keyword">for</span>(<span class="variable">$k</span> = <span class="number">1</span>;<span class="variable">$k</span>&amp;lt;=<span class="number">5</span>;<span class="variable">$k</span>++)
+    {
+        <span class="keyword">if</span>(<span class="variable">$i</span>==<span class="number">10</span>)
+        {
+            <span class="variable">$filename</span> = <span class="string">'u'</span>. <span class="variable">$i</span> .<span class="string">'LSD0'</span>. <span class="variable">$k</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="keyword">else</span>
+        {
+            <span class="variable">$filename</span> = <span class="string">'u0'</span>. <span class="variable">$i</span> .<span class="string">'LIT'</span>. <span class="variable">$j</span> .<span class="string">'f.wav'</span>;
+        }
+        <span class="variable">$p</span> = <span class="keyword">fopen</span>(<span class="variable">$filename</span>,<span class="string">'w+'</span>);
+        copy(SOURSES.<span class="variable">$filename</span>,<span class="variable">$filename</span>);
+        <span class="keyword">fclose</span>(<span class="variable">$p</span>);
+    }
+}
+</pre></figure>
+
+<p>Ok，在建立一个a.bat文件输入：</p>
+<figure class="highlight"><pre><span class="variable">$ </span>php a.php
+</pre></figure>
+
+<p>a.php是php文件名，把这两个文件放在最初建立的‘听力’文件夹中，双击 a.bat就可以啦。那个php代码非常简单，只使用了一个copy函数，基本会英语的人就能看明白什么意思
+注：前提是在个人电脑上安装好了 php。当然也可以使用其他语言，但是作为phper，也应该多尝试尝试php的各种功能，还是很有用的</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li></ul><a href="/2010/06/27/listen/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-03-12T01:00:49.000Z" class="post__time">March 12, 2010</time><h1 class="post__title"><a href="/2010/03/12/winter-vacation-summary/">寒假学习总结</a></h1></header><div class="post__main"><p>一个寒假过来，这几天还在忙于适应学校生活呢。在家里一个多月几乎与电脑完全隔离，几许欣慰，总算不用整天对着电脑啦，呵呵。按照有关规定：每天上网6小时以上属于网瘾，那我们工作室所有人都有网瘾啦。不过技术总无法离我而去，有时候甚至想，来到工作室，一旦进入计算机世界，我就只能如此了吧。而且我越来越清楚的看到，自己对计算机技术的书爱不释手，而本专业的教材却很难静心看下去。无论如何，我总是在挣扎着，专业一定不能放弃啊。我也相信自己能够做到。第一次会上，副部老冯说：“寒假让你们回去看的资料，大家有什么体会，都写下来……”。也许大家都不喜欢做家庭作业吧，我也是，但在寒暑假看一些技术类的书，已然成为我的一种习惯。我觉得，作为程序组人员，对于技术的爱好是一种基本素质，所以我更倡导一种自然的学习方式，大家对什么感兴趣自己去学吧。只要投入，你就能从中发现乐趣的。在这里再提一下我们工作室的口号“激情投入，互动创造”，我很喜欢这句话，大家在工作室应该享受一种投入创造的快乐。下面总结一下我在寒假的学习情况吧。</p>
+<p>寒假带了三本薄薄的书，书贵在精致，而不是数量，一个假期能看两三本书就够了。这三本书分别是，PHP高级程序设计_模式、框架与测试 、JavaScript语言精粹。还有一本是心理学的，就不提啦。这第二本尤其让人震撼，在此我摘一些卓越网的评价：这是一本厚积薄发、“薄”大精深的书。 Douglas Crockford仅仅用了160页来道出JavaScript的语言本质，值得任何正在或者想从事JavaScript开发的人阅读，并且非常需要反复阅读。……重读这本书后，如醍醐灌顶，对JS有了新的认识。不能不说这本JS语言精粹是我读过的一本最好的技术类书。我尤其喜欢这种简约的风格。总的来说，寒假的学习分为三大类，PHP、JavaScript和Vim使用。分别来谈谈</p>
+<p>首先是PHP，这个寒假接触了一些PHP高级技术，比如PHP类、设计模式之类的。我觉得对于我们而言，书中所提到的PHP编码规范是很值得我们学习的，程序代码中的编码规范通常包括两大点：变量的命名和注解规范。还有一点就是代码的缩进，这个通常用tab键实现。常用的变量命名法（也包括css属性名或者class id名）有四种：匈牙利命名法、骆驼命名法、下划线命名法和帕斯卡命名法。在这里各举一个PHP命名的例子</p>
+<p>$strMessage，这里str表示的变量贮存的是一个字符串string，匈牙利命名法关键是：变量名＝属性＋类型＋对象描述</p>
+<p>$nowDateCn，驼峰命名就是当变量名或函式名是由一个或多个单字连结在一起，而构成的唯一识别字时，第一个单字以小写字母开始；第二个单字的首字母大写或每一个单字的首字母都采用大写字母。</p>
+<p>$now_date_cn，下划线命名用下划线分割变量，这在css中属性常用</p>
+<p>$NowDateCn，帕斯卡命名法与驼峰命名法的差别仅仅在于它的第一个单词首字母也是大写的。</p>
+<p>各种命名法其实可以混合使用，尤其是第一种和第三种可以很好的结合在一起使用。需要提醒的是，在一个应用程序中，应该坚持统一的命名规则，这样有利于代码的维护阅读。我想我们工作室最好能够形成一套统一的规范，这个工作我正在考虑当中呢。我们应该给工作室留下一些什么，比如还有我们需要一个常用的类库，这非常有利于我们的快速开发。
+关于注解，PHP常用为 phpdoc模式，如下为一个函数的注解</p>
+<figure class="highlight"><pre><span class="javadoc">/**
+* 提交发送数据返回已序列化的PHP数据内容
+*
+*<span class="javadoctag"> @param</span> string $PostUrl 要指交的远程地址
+*<span class="javadoctag"> @param</span> array $data 要提交的数据
+*<span class="javadoctag"> @return</span> obj  远程返回的对像
+*/</span>
+function getWebServerData($PostUrl,$data)
+{
+<span class="comment">//函数体</span>
+}
+</pre></figure>
+
+<p>第一行为/<em>*，最后一行</em>/，这种注解模式是一种可编译模式，也就是程序在编译时，这些注解不会被PHP解析程序忽视，而是可以成为一种PHP函数或类自身反射的信息数据。反射在程序中指的是一种语言对自身的判断，比如PHP函数func_get_args可以在本函数中或者传入参数序列。这有些想心理学中的元的概念，比如元认知，元记忆，元认知是指人对自身认知活动的时间分配、精力控制等等调控行为，而元记忆指人对自身记忆的记忆，也就是你知道自己记得什么（有些东西虽然自己知道自己记得，但是在某些情况下就是想不起来，比如某个熟人的名字一下子忘记了）。不过这对于我们没有太大的用处，在小规模应用中，很难用到反射的。所以注解用/*开头也行。@param这个表示传入参数，后面是函数参数类型，这个很容易看明白的。注解内容第一行是对本函数的描述。@param，@return这两个参数在函数注解中用得最多。</p>
+<p>再看看Zend framework的注解，常用的还有@author表示作者</p>
+<figure class="highlight"><pre><span class="javadoc">/**
+* Zend Framework
+*
+* LICENSE
+*
+* This source file is subject to the new BSD license that is bundled……
+*
+*<span class="javadoctag"> @category</span>   Zend
+*<span class="javadoctag"> @package</span>    Zend_Db
+*<span class="javadoctag"> @subpackage</span> Table
+*<span class="javadoctag"> @copyright</span>  Copyright (c) 2005-2009 Zend Technologies USA Inc. (http://www.zend.com)
+*<span class="javadoctag"> @license</span>    http://framework.zend.com/license/new-bsd     New BSD License
+*<span class="javadoctag"> @version</span>    $Id: Exception.php 16541 2009-07-07 06:59:03Z bkarwin $
+*/</span>
+</pre></figure>
+
+<p>注解规范也属于代码规范的重要内容之一啦。说这么多其实，我的目的是能够在工作室留下一套常用的PHP类库或函数库，并且告诫程序组成员，代码是人可以阅读的计算机语言，所以可读性很重要。不过一个优秀的好用的函数库或类库，最重要的还是它们的逻辑实现过程，这个得靠大家的一起努力啦。工作室大一组员要加油啦，下学期也许我整个学期都要去实习，工作室重任就落在你们肩上了。此外就是JavaScript啦，这个暂时搁置，有机会给大家做一个 JavaScript专题，现代web技术JavaScript太强大了，这个世界已然不能没有你。那本JavaScript语言精粹，大家想看的可以问我要，现在我又借过来，准备看第二遍呢。</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li><li class="post__tag__item"><a href="/tags/经验分享/" class="post__tag__link">经验分享</a></li></ul><a href="/2010/03/12/winter-vacation-summary/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2009-04-18T01:50:32.000Z" class="post__time">April 18, 2009</time><h1 class="post__title"><a href="/2009/04/18/a-little-php-program/">一个小小的php程序</a></h1></header><div class="post__main"><p>记得有一次樊老师让我把一个文件夹中所有的文件改一下文件名，弄了很久弄出一个bat的批处理文件，自己还不大明白什么意思，不过终于是弄好了。这次帮朋友下载了一百多个字体，而且每一个都在不同的文件夹中，这样用粘贴复制累死了，我想用php写一个不会有什么问题吧，然后结合网上一些资料，这个家伙弄出来了：</p>
+<figure class="highlight"><pre><span class="comment">/**
+ * 使用方法如下
+ * shift函数的第一个文件为查找文件，后一参数为拷贝后的文件夹,
+ * 后一个文件路径一定不能位于第一个文件中，这样可能进入死循环
+ * 注意:文件路径一定要用/而不是\，路径要全，不能留开口如：H:/fonts；默认的是查找ttf格式字体文件，查找其他需要自行修改
+ * 虽然这些稍加修改就能避免的，但是这仅仅给自己用用，我肯定假设自己会用，故稍加注意就好使
+ * 只要电脑上配有php，在任何地方都可以运行，双击我给的批处理文件就行
+ * 测试发现拷贝大些的文件速度不快，但是对内存和cpu的占有不是很大
+ */</span>
+<span class="function"><span class="keyword">function</span> <span class="title">type</span><span class="params">(<span class="variable">$filename</span>)</span>
+{</span>
+
+    <span class="variable">$match_type</span> = <span class="keyword">array</span>(&quot;ttf&quot;);<span class="comment">//目标后缀数组</span>
+
+    <span class="keyword">foreach</span>(<span class="variable">$match_type</span> <span class="keyword">as</span> <span class="variable">$val</span>)
+    {
+        <span class="comment">//循环匹配数组$match_type中的后缀，自行修改匹配模式可以选择不同的文件名，不分大小写</span>
+        <span class="keyword">if</span>(preg_match(&quot;/\.<span class="variable">$val</span>$/i&quot;,<span class="variable">$filename</span>))
+        {
+            <span class="keyword">return</span> <span class="keyword">true</span>;
+        }
+    }
+
+    <span class="keyword">return</span> <span class="keyword">false</span>;
+}
+
+<span class="function"><span class="keyword">function</span> <span class="title">shift</span><span class="params">(<span class="variable">$dir</span>,<span class="variable">$md</span>)</span>
+{</span>
+    <span class="keyword">if</span>(is_dir(<span class="variable">$dir</span>))
+    {
+        <span class="variable">$pp</span> = fopen(<span class="variable">$md</span>.<span class="string">'message.txt'</span>,&quot;w+&quot;);<span class="comment">//创建信息文件，文件将说明成功复制的文件及失败了文件</span>
+
+        <span class="variable">$mesage</span> = <span class="string">''</span>;<span class="comment">//初始化信息</span>
+
+        <span class="keyword">if</span> (<span class="variable">$dh</span> = opendir(<span class="variable">$dir</span>))
+        {
+            <span class="comment">//循环读取文件中的文件名</span>
+            <span class="keyword">while</span> ((<span class="variable">$file</span>= readdir(<span class="variable">$dh</span>)) !== <span class="keyword">false</span>)
+            {
+
+                <span class="variable">$dir_new</span>=<span class="variable">$dir</span>;
+
+                <span class="variable">$dir_new</span>.=<span class="variable">$file</span>.&quot;/&quot;;
+
+                <span class="comment">//如果是文件夹，递归重新调用shift函数</span>
+                <span class="keyword">if</span>((is_dir(<span class="variable">$dir_new</span>)) &amp;&amp; <span class="variable">$file</span>!=&quot;.&quot; &amp;&amp; <span class="variable">$file</span>!=&quot;..&quot;)
+                {
+                    shift(<span class="variable">$dir_new</span>,<span class="variable">$md</span>);
+                }
+                <span class="keyword">else</span>
+                {
+                    <span class="keyword">if</span>(<span class="variable">$file</span>!=&quot;.&quot; &amp;&amp; <span class="variable">$file</span>!=&quot;..&quot;)
+                    {
+                        <span class="comment">//如果是文件</span>
+                        <span class="keyword">if</span>(type(<span class="variable">$file</span>))
+                        {
+                            <span class="variable">$newfile</span> =<span class="variable">$md</span>.<span class="variable">$file</span>;
+                            <span class="variable">$p</span>=fopen(<span class="variable">$newfile</span>,<span class="string">'w+'</span>);<span class="comment">//在目标文件夹中创建拷贝文件</span>
+                            <span class="keyword">if</span>(copy(<span class="variable">$dir_new</span>,<span class="variable">$newfile</span>))
+                            {<span class="comment">//复制文件</span>
+                                <span class="variable">$mesage</span> .= &quot;成功复制&quot;.<span class="variable">$file</span>.&quot; : <span class="variable">$dir_new</span>=&gt;<span class="variable">$md</span><span class="comment">//记录\n&quot;;</span>
+                            }
+                            <span class="keyword">else</span>
+                            {
+                                <span class="variable">$mesage</span> .= &quot;复制失败&quot;.<span class="variable">$file</span>.&quot;<span class="comment">//记录\n&quot;;</span>
+                            }
+
+                            fclose(<span class="variable">$p</span>);
+
+                        }
+
+                    }
+
+                }
+
+            }
+            closedir(<span class="variable">$dh</span>);
+            fwrite(<span class="variable">$pp</span>,<span class="variable">$mesage</span>);
+            fclose(<span class="variable">$pp</span>);
+        }
+    }
+}
+
+shift(<span class="string">"H:/fonts/"</span>,<span class="string">"E:/ttf/"</span>);
+</pre></figure>
+
+<p>运行使用的bat批处理文件就两句</p>
+<figure class="highlight"><pre><span class="variable">$ </span>php file.php
+</pre></figure>
+
+<p>呵呵，原理php还是很有用嘛……下面是附件，php在本地运行不需要在发布根目录下，只要两个文件在一起就行</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li><li class="post__tag__item"><a href="/tags/php/" class="post__tag__link">php</a></li></ul><a href="/2009/04/18/a-little-php-program/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><span title="Previous" class="page-menu__link icon-arrow-left page-menu__link--disabled"></span></li><li class="page-menu__item"><span title="Next" class="page-menu__link icon-arrow-right page-menu__link--disabled"></span></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
+(document,"script","shepherdwind","count");
+</script>
