@@ -1,0 +1,62 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>改过的bug - shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2014-03-19T12:01:13.000Z" class="post__time">March 19, 2014</time><h1 class="post__title"><a href="/2014/03/19/find-some-bugs/">改过的bug</a></h1></header><div class="post__main"><p>最近改了两个bug，记录一下。</p>
+<h2 id="-">第一个，表单提交问题</h2>
+<p>在售后页面，表单有比较复杂的，逻辑，包括模拟select，select选择提示效果，uploader，复杂校验，表单元素之间逻辑交互。</p>
+<h3 id="-">问题描述</h3>
+<p>上周五，开发说，线上有很多IE8用户数据没有通过前端校验，直接提交到后端，导致很多报错。我研究了很久，最后，发现问题是，校验失效了。</p>
+<h3 id="-">分析</h3>
+<p>直接原因是，整个校验还是有，但是校验失败的情况下，表单还是提交了。在chrome，因为剑平的Auth是基于html5校验的，所以，表单提交动作被拦截了。造成似乎只有IE8有这个问题的假象，从这点看，这次的问题因为剑平Auth选择使用html5标准，从而问题较少了不少。</p>
+<p>继续分析源码，发现问题是以前整个表单的提交动作是由js来完成的，通过submit()函数提交。当Auth的校验通过之后，会提交表单。而现在这个页面的点击按钮由原来的div，变成了button，在一个表单中，button默认是submit类型的。</p>
+<h3 id="-">结论</h3>
+<p>提交按钮由div变成button了，导致页面直接被提交了。我离开把这个button改成div，让开发马上发模板。后来听说，这个改动是玉门改的，当时有个日常需求需要的。不过想想，div作为提交的按钮，确实容易引起误解，改成button，也蛮正常的，只是，这个页面的提交逻辑封装在一个gallery组件里。新接手的时候，难免不清楚这样的逻辑。</p>
+<hr>
+<h2 id="-">第二个，黑盒问题</h2>
+<p>还是售后，要求淘宝小二介入的页面。</p>
+<h3 id="-">问题描述</h3>
+<p>页面大致这样子的</p>
+<p><img src="http://gtms02.alicdn.com/tps/i2/T1TAidFyxhXXXyuw_2-515-214.png" alt="taobao in"></p>
+<p>退款原因是一个下拉框，点击修改，下拉框显示。下拉框是模拟原始的下拉框，有一个真正的select元素，但是隐藏在模拟select框下。现在问题是，点击修改的时候，变成下面样子了</p>
+<p><img src="http://gtms04.alicdn.com/tps/i4/T15W9nFvJeXXXFfqH0-514-216.png" alt="after change"></p>
+<p>多了一个签收人，这个地方，逻辑来源于，选择下拉框的时候，会出现二级选择框(实际上，这是第三级)。开发说，这个签收人是下拉框第一项元素对应的二级radio，但是现在不应该出现的情况出现了。</p>
+<h3 id="-">分析过程</h3>
+<p>首先断点一下，发现点击修改的时候，下拉框首先选择了第一项，然后又变回去了。这个过程很诡异，不清楚是什么导致了下拉框select的值被修改的。</p>
+<p>问题很麻烦，因为这个页面使用MVVM(bidi)实现的，下拉框和JS变量绑定在一起，下拉框dom的修改，或者js变量的修改都会直接体现在dom的改变上。js变量在什么地方被修改了，这个也不是很清楚，任何引用那个变量的地方，都可能会修改到那个值。</p>
+<p>Bidi的调试，一直是个非常头痛的问题，上次玉门发现一个bug，找我看了好久，我最后凭感觉找到一个隐藏的bug。这里涉及到Bidi里面的model和view(dom)，另外还有剑平的模拟选择框，三个对象都可以能有问题。select的改变犹如一个黑盒，时间绑定一方面完全解绑了发布事件者和事件订阅之间的联系，同时这种解耦导致调试非常麻烦，你完全不知道是在什么情况下处罚了某一事件。</p>
+<p>这时候，我想到了bidi曾经遇到一个问题，Firefox的Object下有一个方法watch，这个watch是火狐独有的方法，基本没什么用。不过能够监控变量被修改，这个可以之间从前面的黑盒中找到问题发生的现场。</p>
+<p>有了这个思路，就好办了。首先，点击修改后“退款原因”被修改了，那么一定会映射到对应的js变量<code>reasons.defaultValue</code>上，只需要监控谁在修改了<code>reasons.defaultValue</code>。然后，写下watch函数的是实现：</p>
+<figure class="highlight"><pre>  <span class="function"><span class="keyword">function</span> <span class="title">watch</span><span class="params">(obj, property)</span>{</span>
+
+    <span class="comment">// 通过闭包，存贮value</span>
+    <span class="keyword">var</span> nowVal = obj[property];
+
+    <span class="keyword">return</span> <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
+
+      Object.defineProperty(obj, property, {
+        <span class="keyword">get</span>: <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
+          <span class="keyword">return</span> nowVal;
+        },
+        <span class="keyword">set</span>: <span class="function"><span class="keyword">function</span><span class="params">(v)</span>{</span>
+          <span class="comment">// 设置一个断点，查看变量被修改的场景</span>
+          debugger
+          nowVal = v;
+          <span class="keyword">return</span> v;
+        }
+      });
+
+    }
+
+  }
+  watch(reasons, <span class="string">'defaultValue'</span>)();
+</pre></figure>
+
+<h2 id="-">结论</h2>
+<p>修改的时候有了debugger，很快发现，点击修改按钮之后，reasons.defaultValue确实被改变了，根据函数调用过程，直接找到问题症结所在</p>
+<p><img src="http://gtms03.alicdn.com/tps/i3/T17aCvFtNfXXcEoYwA-432-313.png" alt="problem"></p>
+<p>图片中，有一部分被挡住了。这是模拟选择框完成的事情，触发afterValueChange事件的时候，会执行操作把选择框的值修改。实际上，是模拟选择框的值回写到原始的select上，然后bidi会根据原生select的改变执行DOM到bidi数据的绑定。</p>
+<p>bidi都是直接和原始表单元素打交道，涉及到模拟选择框，中间就有点绕了。</p>
+<p>整个过程是，点击修改按钮，然后会显示模拟选择框，问题是，显示模拟选择框的时候，模拟选择框触发了afterValueChange事件，上面图片看到的，newVal是null，这种情况下，下拉框的value被设置为空，这个时候，浏览器默认选中了第一个。然后原生select被修改，触发change事件，change事件导致bidi里面的绑定生效，初上上面那个多余的收获签收人。</p>
+<p>最后修改的方案还好，那个valueChange事件不应该触发的，不过那个和KISSY自身的select组件有关，也不好改动。最后，我修改了下，让bidi在显示模拟选择框过程中，禁止双向绑定功能200ms，完整切断上面整个流程，问题基本解决了。这还是一个大坑，在这里记录一下，一来，后面维护的也可以有个参照。另外，我感觉watch的方式用来调试还是非常给力的，终于解决了bidi最麻烦的不可调式的问题。</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/bugs/" class="post__tag__link">bugs</a></li></ul><a href="/2014/03/19/find-some-bugs/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><div class="comments"><div id="disqus_thread"><noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
+</noscript></div></div></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><span title="Previous" class="page-menu__link icon-arrow-left page-menu__link--disabled"></span></li><li class="page-menu__item"><a title="Next" href="/2014/03/13/Content-Security-Policy/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
+(document,"script","shepherdwind","embed");
+</script>
