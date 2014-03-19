@@ -1,4 +1,61 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2014-03-13T10:15:33.000Z" class="post__time">March 13, 2014</time><h1 class="post__title"><a href="/2014/03/13/Content-Security-Policy/">[翻译]内容安全策略(CSP)</a></h1></header><div class="post__main"><blockquote>
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2014-03-19T11:59:04.000Z" class="post__time">March 19, 2014</time><h1 class="post__title"><a href="/2014/03/19/find-the-bugs/"></a></h1></header><div class="post__main"><h2 id="-bug">改过的bug</h2>
+<p>最近改了两个bug，记录一下。</p>
+<h3 id="-">第一个，表单提交问题</h3>
+<p>在售后页面，表单有比较复杂的，逻辑，包括模拟select，select选择提示效果，uploader，复杂校验，表单元素之间逻辑交互。</p>
+<h4 id="-">问题描述</h4>
+<p>上周五，开发说，线上有很多IE8用户数据没有通过前端校验，直接提交到后端，导致很多报错。我研究了很久，最后，发现问题是，校验失效了。</p>
+<h4 id="-">分析</h4>
+<p>直接原因是，整个校验还是有，但是校验失败的情况下，表单还是提交了。在chrome，因为剑平的Auth是基于html5校验的，所以，表单提交动作被拦截了。造成似乎只有IE8有这个问题的假象，从这点看，这次的问题因为剑平Auth选择使用html5标准，从而问题较少了不少。</p>
+<p>继续分析源码，发现问题是以前整个表单的提交动作是由js来完成的，通过submit()函数提交。当Auth的校验通过之后，会提交表单。而现在这个页面的点击按钮由原来的div，变成了button，在一个表单中，button默认是submit类型的。</p>
+<h4 id="-">结论</h4>
+<p>提交按钮由div变成button了，导致页面直接被提交了。我离开把这个button改成div，让开发马上发模板。后来听说，这个改动是玉门改的，当时有个日常需求需要的。不过想想，div作为提交的按钮，确实容易引起误解，改成button，也蛮正常的，只是，这个页面的提交逻辑封装在一个gallery组件里。新接手的时候，难免不清楚这样的逻辑。</p>
+<h3 id="-">第二个，黑盒问题</h3>
+<p>还是售后，要求淘宝小二介入的页面。</p>
+<h4 id="-">问题描述</h4>
+<p>页面大致这样子的</p>
+<p><img src="http://gtms02.alicdn.com/tps/i2/T1TAidFyxhXXXyuw_2-515-214.png" alt="taobao in"></p>
+<p>退款原因是一个下拉框，点击修改，下拉框显示。下拉框是模拟原始的下拉框，有一个真正的select元素，但是隐藏在模拟select框下。现在问题是，点击修改的时候，变成下面样子了</p>
+<p><img src="http://gtms04.alicdn.com/tps/i4/T15W9nFvJeXXXFfqH0-514-216.png" alt="after change"></p>
+<p>多了一个签收人，这个地方，逻辑来源于，选择下拉框的时候，会出现二级选择框(实际上，这是第三级)。开发说，这个签收人是下拉框第一项元素对应的二级radio，但是现在不应该出现的情况出现了。</p>
+<h4 id="-">分析过程</h4>
+<p>首先断点一下，发现点击修改的时候，下拉框首先选择了第一项，然后又变回去了。这个过程很诡异，不清楚是什么导致了下拉框select的值被修改的。</p>
+<p>问题很麻烦，因为这个页面使用MVVM(bidi)实现的，下拉框和JS变量绑定在一起，下拉框dom的修改，或者js变量的修改都会直接体现在dom的改变上。js变量在什么地方被修改了，这个也不是很清楚，任何引用那个变量的地方，都可能会修改到那个值。</p>
+<p>Bidi的调试，一直是个非常头痛的问题，上次玉门发现一个bug，找我看了好久，我最后凭感觉找到一个隐藏的bug。这里涉及到Bidi里面的model和view(dom)，另外还有剑平的模拟选择框，三个对象都可以能有问题。select的改变犹如一个黑盒，时间绑定一方面完全解绑了发布事件者和事件订阅之间的联系，同时这种解耦导致调试非常麻烦，你完全不知道是在什么情况下处罚了某一事件。</p>
+<p>这时候，我想到了bidi曾经遇到一个问题，Firefox的Object下有一个方法watch，这个watch是火狐独有的方法，基本没什么用。不过能够监控变量被修改，这个可以之间从前面的黑盒中找到问题发生的现场。</p>
+<p>有了这个思路，就好办了。首先，点击修改后“退款原因”被修改了，那么一定会映射到对应的js变量<code>reasons.defaultValue</code>上，只需要监控谁在修改了<code>reasons.defaultValue</code>。然后，写下watch函数的是实现：</p>
+<figure class="highlight"><pre>  <span class="function"><span class="keyword">function</span> <span class="title">watch</span><span class="params">(obj, property)</span>{</span>
+
+    <span class="comment">// 通过闭包，存贮value</span>
+    <span class="keyword">var</span> nowVal = obj[property];
+
+    <span class="keyword">return</span> <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
+
+      Object.defineProperty(obj, property, {
+        <span class="keyword">get</span>: <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
+          <span class="keyword">return</span> nowVal;
+        },
+        <span class="keyword">set</span>: <span class="function"><span class="keyword">function</span><span class="params">(v)</span>{</span>
+          <span class="comment">// 设置一个断点，查看变量被修改的场景</span>
+          debugger
+          nowVal = v;
+          <span class="keyword">return</span> v;
+        }
+      });
+
+    }
+
+  }
+  watch(reasons, <span class="string">'defaultValue'</span>)();
+</pre></figure>
+
+<h3 id="-">结论</h3>
+<p>修改的时候有了debugger，很快发现，点击修改按钮之后，reasons.defaultValue确实被改变了，根据函数调用过程，直接找到问题症结所在</p>
+<p><img src="http://gtms03.alicdn.com/tps/i3/T17aCvFtNfXXcEoYwA-432-313.png" alt="problem"></p>
+<p>图片中，有一部分被挡住了。这是模拟选择框完成的事情，触发afterValueChange事件的时候，会执行操作把选择框的值修改。实际上，是模拟选择框的值回写到原始的select上，然后bidi会根据原生select的改变执行DOM到bidi数据的绑定。</p>
+<p>bidi都是直接和原始表单元素打交道，涉及到模拟选择框，中间就有点绕了。</p>
+<p>整个过程是，点击修改按钮，然后会显示模拟选择框，问题是，显示模拟选择框的时候，模拟选择框触发了afterValueChange事件，上面图片看到的，newVal是null，这种情况下，下拉框的value被设置为空，这个时候，浏览器默认选中了第一个。然后原生select被修改，触发change事件，change事件导致bidi里面的绑定生效，初上上面那个多余的收获签收人。</p>
+<p>最后修改的方案还好，那个valueChange事件不应该触发的，不过那个和KISSY自身的select组件有关，也不好改动。最后，我修改了下，让bidi在显示模拟选择框过程中，禁止双向绑定功能200ms，完整切断上面整个流程，问题基本解决了。这还是一个大坑，在这里记录一下，一来，后面维护的也可以有个参照。另外，我感觉watch的方式用来调试还是非常给力的，终于解决了bidi最麻烦的不可调式的问题。</p>
+</div><footer class="post__foot u-cf"><a href="/2014/03/19/find-the-bugs/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2014-03-13T10:15:33.000Z" class="post__time">March 13, 2014</time><h1 class="post__title"><a href="/2014/03/13/Content-Security-Policy/">[翻译]内容安全策略(CSP)</a></h1></header><div class="post__main"><blockquote>
 <p>原文：<a href="https://github.com/blog/1477-content-security-policy" target="_blank">Content Security Policy</a><br>
 作者：<a href="https://github.com/josh" target="_blank">josh</a></p>
 </blockquote>
@@ -409,7 +466,7 @@ JSONElementList :
 <p>从算法本身而言，第二种算法想法非常奇妙，容易理解，实现代码优雅。只是初始化比较慢，在初始化可以接受的情况下，还是非常推荐的，比如淘宝线上的sku判断。此外，第二种算法获得的结果比起第一种更具有价值，第二种方式直接取得组合对应的数目，价格信息，而第一种只是判断是否可以组合，从实际应用角度而言，第二种方式还是剩下不少事的。</p>
 <p>感觉只要善于去发现，还能能够找到一些有意思的解决问题思路的。</p>
 <script src="http://ued.taobao.org/blog/wp-content/uploads/2012/07/hanwen/path.js" charset="utf-8"></script>
-</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/算法/" class="post__tag__link">算法</a></li></ul><a href="/2012/04/27/an-fun-discuss/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2011-05-15T01:05:43.000Z" class="post__time">May 15, 2011</time><h1 class="post__title"><a href="/2011/05/15/peer-say/">同伴提名测验平台</a></h1></header><div class="post__main"><p>因为找工作的事情，在杭州呆了近四个月，然后回到长沙，闲置了一个月，工作还是没有确定，无奈，只能匆匆忙忙赶回学校写论文了，剩不到二十天时间。和<a href="http://www.nenu.edu.cn/professor/pro/show.php?flag=1&amp;id=668" target="_blank">盖老师</a>商量，做实验或者写研究综述都来不及了，于是我说，如果能够做一个毕业设计啥的，也许更容易些。于是，盖老师给我推荐了这么个题目，<a href="http://shepherdwind.com/peersay/" target="_blank">同伴提名测验平台</a>。</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/算法/" class="post__tag__link">算法</a></li></ul><a href="/2012/04/27/an-fun-discuss/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2011-05-15T01:05:43.000Z" class="post__time">May 15, 2011</time><h1 class="post__title"><a href="/2011/05/15/peer-say/">同伴提名测验平台</a></h1></header><div class="post__main"><p>因为找工作的事情，在杭州呆了近四个月，然后回到长沙，闲置了一个月，工作还是没有确定，无奈，只能匆匆忙忙赶回学校写论文了，剩不到二十天时间。和<a href="http://www.nenu.edu.cn/professor/pro/show.php?flag=1&amp;id=668" target="_blank">盖老师</a>商量，做实验或者写研究综述都来不及了，于是我说，如果能够做一个毕业设计啥的，也许更容易些。于是，盖老师给我推荐了这么个题目，<a href="http://peersay.sinaapp.com/" target="_blank">同伴提名测验平台</a>。</p>
 <p>对于任何计算机开发项目，最重要的就是一个词<strong>速度</strong>，开发速度和运行速度，具体来说表现在代码可读性、可维护性、重用以及程序运行的效率、性能等方面。不过，通常程序员写代码的速度会和程序运行速度相冲突的，微观来看，我们经常遇到的就是一个算法中时间与空间的权衡。那么究竟如何处理，这就得依据具体情况而定了。</p>
 <h2 id="-">大胆使用开源吧</h2>
 <p>一直对开源怀有一种敬畏的心态，感觉就像古人瞻仰圣人“高山仰止，景行行止。虽不能至，然心向往之。”有时甚至妄自菲薄，感叹，这个世界有如此完美的技术，强如jQuery、WordPress，那么我们这些程序员还能再做什么呢。当然，那时候我依然停留在Dreamweaver+ZendStudio+WAMP开发时代，实际上，我离开源还有一段好长的距离。同时，作为web开发者，总是对自己作为一个程序员是否合格感到心虚，从传统影响来看，桌面应用才算是真正的程序吧。去一个学校应聘时，那信息中心的老师说，哦，就是一个网页啊，哪里是什么信息系统啊。</p>
@@ -445,7 +502,7 @@ JSONElementList :
 <p>想想还是尽可能对用户少一些干扰好吧。如此，便整体上重构代码，把花了大半天实现的拖拽效果和弹窗提示并禁止继续选择的代码全部删掉。把所有的选择项目由achor标签改为checkbox，看了很久觉得有些舍不得，但还是都改了，做了一个飞跃的效果（选中一个则从下面的box中跳出到上面，反之亦然）——程序员总是忘不了炫耀自己的技术，尤其是前端。代码简单了，我却有些甘心了。</p>
 <p>到了今天终于发布了，拿到班上进行测验。班上同学都非常支持，尤其是女生，刚发有动作了，非常感谢她们。然后，有人发来回馈，找名字找得好累啊，把字调大一些吧。最后，同学说，一个东西跑了其他得都需要往前跳一个位置，眼花缭乱的，干脆把跳跃的效果也删了。这时候Backbone的MVC威力大显，只需要稍微修改一些html模板，然后删除跳跃动画的函数就行了。小小的删除，却删去我费了好多精力写的代码。但是，用户体验与程序员的技术无关啊，我需要的自己的东西给用户使用，这才是真正用户体验所要关注的吧，很多时候使用简单的方法实现就好，关键是有效吧。</p>
 <h2 id="-">结束语</h2>
-<p>转眼一个下午过去了啊，暂时就写到这里吧，以后再补充。最后发一下发布线上的<a href="http://shepherdwind.com/peersay/" target="_blank">地址</a>，使用测试账户可以登陆玩玩，用户名从被试1-被试31，密码是全拼。</p>
+<p>转眼一个下午过去了啊，暂时就写到这里吧，以后再补充。最后发一下发布线上的<a href="http://peerasy.sinaapp.com/" target="_blank">地址</a>，使用测试账户可以登陆玩玩，用户名从被试1-被试31，密码是全拼。</p>
 </div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php/" class="post__tag__link">php</a></li><li class="post__tag__item"><a href="/tags/前端/" class="post__tag__link">前端</a></li></ul><a href="/2011/05/15/peer-say/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-12-18T20:03:50.000Z" class="post__time">December 19, 2010</time><h1 class="post__title"><a href="/2010/12/19/d2-some-feeling/">第五届D2前端技术论坛的一些感受</a></h1></header><div class="post__main"><p>来到杭州十多天了，恰好赶上<a href="http://www.d2forum.org/" target="_blank">D2前端大会</a>，非常幸运，发过微薄，还觉得不过瘾。</p>
 <p>前端这个行业似乎越来越强大了，虽然国内比世界还慢了两年，但<span style="text-decoration: line-through;">从07年淘宝首先招聘前端工程师</span>（根据<a href="http://woooh.com/" target="_blank">Aether</a>提供的信息，此处有误，中国何时开始有前端这个职位无从考证了）。在大会上还看到华为的工程师过来，还有思科来的嘉宾的杜欢，这些看起来和web没有关系的公司都对前端如此有兴趣，让我很是惊讶。</p>
 <p>回顾上周刚刚结束的<a href="http://velocity.oreilly.com.cn/" target="_blank">velocity中国web性能大会</a>，D2显得更加本土化。这样也好，让我们首先看看国外大神强如facebook都在干啥，再回顾回顾我们自己，不能只看着硅谷，那些大公司哪个能够在中国的大地占领市场呢。</p>
@@ -481,10 +538,10 @@ JSONElementList :
 <li>略过。（一直next到第四步）</li>
 <li>当问及许可号码时，输入30001359390点击更新（update），然后再输入30001374190，点击再次点击更新。（第四步最是关键，保证SPSS所有模块都有安装）</li>
 <li>然后一直点击下一步就OK了（这不是翻译哦）。
-感觉蛮简单的，就不贴图了，最后附上<a href="http://shepherdwind.com/wp-content/uploads/2010/09/spss11.zip" target="_blank">电子书</a>下载，祝大家学习愉快，有问题留言联系。</li>
+感觉蛮简单的，就不贴图了，最后附上<a href="/assets/files/spss11.zip">电子书</a>下载，祝大家学习愉快，有问题留言联系。</li>
 </ol>
 <p>2010年12月19日修改</p>
-<p>因为博客服务器被服务器给停了——淘宝的商户不值得信任啊。所以这份文档的电子书也丢失了。又有很多人问起电子书就再加上了。<a href="http://shepherdwind.com/wp-content/uploads/2010/09/spss11.zip" target="_blank">电子书直接下载</a>，这个更像是一个说明文档，需要什么统计方法，跟着做就行，看书还是<a href="http://book.douban.com/subject/1577600/" target="_blank">推荐这本</a>。</p>
+<p>因为博客服务器被服务器给停了——淘宝的商户不值得信任啊。所以这份文档的电子书也丢失了。又有很多人问起电子书就再加上了。<a href="/assets/files/spss11.zip">电子书直接下载</a>，这个更像是一个说明文档，需要什么统计方法，跟着做就行，看书还是<a href="http://book.douban.com/subject/1577600/" target="_blank">推荐这本</a>。</p>
 <hr>
 <p>中国向来都是盗版之乡，但是谁又不愿意免费享用着这世界最新最优秀的软件呢。但是本文所提到的SPSS软件，其盗版确实不是来自中国。让我们揭开这享誉全球的统计软件的神秘面纱吧。</p>
 <h1 id="brief">Brief</h1>
@@ -493,7 +550,7 @@ JSONElementList :
 <p>至于为何是SPSS11.5英文版，有以下几点原因：</p>
 <ol>
 <li>据我们伟大的盖晓松老师（盖老师是绝对的专家）所说，11.5是唯一结果测试可以使用的破解版，如果安装更高级版本无法破解，而且会因此而无法安装其他版本的SPSS。</li>
-<li>张文彤老师出版了套SPSS统计软件的教材，分为高级部分和初级部分两本。这本书的电子版下载请<a href="http://shepherdwind.com/wp-content/uploads/2010/09/spss11.zip" target="_blank">spss11</a>。有教材有还有软件，万事俱备啊。</li>
+<li>张文彤老师出版了套SPSS统计软件的教材，分为高级部分和初级部分两本。这本书的电子版下载请<a href="/assets/files/spss11.zip">spss11</a>。有教材有还有软件，万事俱备啊。</li>
 <li>虽然SPSS可能已经升级到了18、20了，但是对于统计软件而言，更高级别所提供的不是计算的精确，也不是统计方法的优化，只是外观更加漂亮，操作更容易而已。对于我们的目的而言，学术统计使用11.5版本足够了（经常在心理学报上看有人用SPSS 10）。</li>
 <li>做统计不是搞娱乐，不是享受。现在的学生不至于对不不了那么一点点地球人都知道的英文吧，而且，很多统计学词汇根本无法翻译成汉语，还不如英文来的直接爽快。</li>
 </ol>
@@ -532,7 +589,7 @@ JSONElementList :
 </pre></figure>
 
 <p>第一列id为一组数据的标识。用集合来描述这列数据是{1,2{4,5},3{6{8,9},7}},如下图：</p>
-<p><img src="http://www.shepherdwind.com/wp-content/uploads/2010/07/2010-07-16_135618.jpg" alt="树结构图" title="树结构图"></p>
+<p><img src="/assets/images/tree.jpg" alt="树结构图" title="树结构图"></p>
 <p>如果上图依次标上数字，就成为了预排序遍历树算法模式的贮存了，看到如此结构自然想到用在PHP中可以使用如此数组来表示</p>
 <figure class="highlight"><pre><span class="keyword">array</span>(<span class="number">1</span>,<span class="number">2</span>,<span class="keyword">array</span>(<span class="number">4</span>,<span class="number">5</span>),<span class="number">3</span>,<span class="keyword">array</span>(<span class="number">6</span>,<span class="keyword">array</span>(<span class="number">8</span>,<span class="number">9</span>),<span class="number">7</span>));
 </pre></figure>
@@ -832,21 +889,7 @@ JSONElementList :
 <span class="number">8.4101</span>
 </pre></figure>
 
-</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li></ul><a href="/2010/07/15/test-of-array_key_exists-vs-isset/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-07-08T22:41:12.000Z" class="post__time">July 9, 2010</time><h1 class="post__title"><a href="/2010/07/09/love-life/">纯真,执着,热爱生活</a></h1></header><div class="post__main"><p>一部现代人的神话《憨豆先生的假期》</p>
-<p>大一时的影评，那时非常喜欢这部电影，现在，看电影总如此匆忙。想想，大一时真好，每到周末就和同学讨论：这个周末去哪玩啊。现在总是没有课，却总有事情。</p>
-<p>这是一部产自英国的喜剧，相比之下，中国所谓&quot;无厘头＂确是可笑多了。看过许多星爷的笑话，却也只记得他巨星的身份，和一些比故事本身更可笑的人物．笑过、开心过后，他没有给我们留下真正的东西．应该说他的电影是精彩的笑话，期待吧，长江七号…</p>
-<p>电影允许高于生活，但不应脱离生活…</p>
-<p><img src="http://shepherdwind.com/wp-content/uploads/2010/07/200721014829.2962198.jpg" alt="憨豆先生的假期" title="憨豆先生的假期"></p>
-<p>这部电影的情节如一条欢快的小溪，跌宕起伏、曲折蜿蜒、让人忍不住大笑，为憨豆的前路而焦急，让人忍不住的感动又忧伤。就这样过来，把一连串不可能的故事衔接的令人不愿相信它只是一部电影，而这一切的美好的发生只因故事的主人公是一个傻子与一个孩子…</p>
-<p>好象是很好笑，但－－更可悲。</p>
-<p>因为傻，所以憨豆才会在无意中使小孩与他父亲分开，然后傻傻的扮一些鬼脸试图使小孩开心，最后自己的一切都不见了，所有的证件。不管怎样，他都要用那得来ＤＣ拍下身边的一些事物，地铁、自己吃饭的场景、商店里马路上路过的人们…他总是冲着镜头傻笑，尽管他是身处法国，我甚至不确定他能否与旁人自然的谈话，没有什么能够阻止他拍摄生活的激情，就算是到了他只剩下ＤＣ时，他依旧那么执着那么开心的拍下身边的一切。为了一张纸，他随手拿下一台自行车硬是追着一辆车走，而且他竟然真的追上了，结果还差点被车上的狗咬，回来是发现自行车已经被一辆经过的坦克了压成条，不过，那台摄象机还在。</p>
-<p>因为不认识路，他确定了一个方向以后，就一直那样走过去，趟过车水马龙的马路引起身旁歪了一地的小车。在最后，忽然看到大海、beach，他痴痴的看者，一边走过去，仿佛世界就只有那等候着他的大海，所以他完全不顾现实是什么，一直那样走去，从楼顶跨过一个大的广告牌，从马路上依次停下的车顶走下，上帝为他安排的是那么的巧妙，他完全不必去理会脚下是不是踩到了他人或者是否能走。他只需傻傻的痴痴的望着大海、望着沙滩，一边拍下这一切。所以这只是一个神话，我们永远只能这样理性的看着脚下小心的走着，就算错过了多少美好。</p>
-<p>这个神话同时又包含了两个美丽的奇迹，戏中戏。如玉上镶嵌上两块钻石，细小却光彩夺人。简单的两过故事，却是直面人性、战争、自然、名誉等这个人类所无法回避的问题。它们合在一起让人在感动之余又有一丝的忧伤。</p>
-<p>憨豆先生拍的那一些画面又无意中成了电影中部电影中最重要的部分，也因此使得影院里本来昏昏欲睡的人们在憨豆逃到荧幕下时，全场欢呼。聚光灯下，那气愤的导演意外的选择与他拥抱，说：尽管我受到很多人的责疑，但我还是坚持自己的方式…哈，这句话很有意思，只有他一个人的电影，那只能如他在电影中所说的：nothing、nothing，and　nothing…</p>
-<p>生活不也如此吗？</p>
-<p>当然，这是一部英国的电影，它肯定也是在宣言西方世界的一些东西。但其中更多的是世界性的，他最根本的一个话题是：生活。我们应该这样的生活在这个世界？开始时憨豆一直那么倒霉，几乎是所有常人所无法忍受的，但他一直用自己执着纯真的心去热爱着生活。</p>
-<p>也许真正傻的人是我们。</p>
-</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/生活/" class="post__tag__link">生活</a></li><li class="post__tag__item"><a href="/tags/电影评论/" class="post__tag__link">电影评论</a></li></ul><a href="/2010/07/09/love-life/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><span title="Previous" class="page-menu__link icon-arrow-left page-menu__link--disabled"></span></li><li class="page-menu__item"><a title="Next" href="/page/2/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li></ul><a href="/2010/07/15/test-of-array_key_exists-vs-isset/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><span title="Previous" class="page-menu__link icon-arrow-left page-menu__link--disabled"></span></li><li class="page-menu__item"><a title="Next" href="/page/2/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
 j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
 (document,"script","shepherdwind","count");
 </script>

