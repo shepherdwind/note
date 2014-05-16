@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>tester</title>
+    <meta charset="utf-8" />
+  </head>
+
+  <body>
+
+    <script type="text/javascript" charset="utf-8">
+
+      function encode(input){
+
+        var ret = '{}';
+
+        try {
+          ret = JSON.parse(input);
+          ret = JSON.stringify(ret);
+        } catch(e) {
+          console.log(e)
+        }
+
+        ret = ret.replace(/<\//g, '<\\/');
+
+        return ret;
+      }
+
+      // change input, make alert(1) run to win
+      input = '{"a": "b<\/script><script>"}';
+      document.write('<script> window.PP = ' + encode(input) + '<\/script>');
+    </script>
+
+  </body>
+
+</html>
