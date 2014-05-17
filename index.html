@@ -1,10 +1,136 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2014-03-19T12:01:13.000Z" class="post__time">March 19, 2014</time><h1 class="post__title"><a href="/2014/03/19/find-some-bugs/">改过的bug</a></h1></header><div class="post__main"><p>最近改了两个bug，记录一下。</p>
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2014-05-17T07:56:11.000Z" class="post__time">May 17, 2014</time><h1 class="post__title"><a href="/2014/05/17/how-to-reliaze-mvvm--bidi/">如何实现一个mvvm组件</a></h1></header><div class="post__main"><p>去年，因为业务需要，实现了一个mvvm组件，<a href="https://github.com/shepherdwind/bidi" target="_blank">bidi</a>。在此，记录一下组件实现的过程与经验。</p>
+<h3 id="-">来源</h3>
+<p>mvvm是Model-View-ViewModel，主要在于双向绑定。这个概念很早就有了，我一直没有具体研究过这个东西，直到有一天，我遇到一个这样的需求：</p>
+<p><img src="https://cloud.githubusercontent.com/assets/452899/3004411/be0da078-dd99-11e3-97de-8e07e384b3cb.png" alt="needs"></p>
+<p>业务场景大致是这样的，在淘宝购物，如果需要退款，首先需要填一个表单，这个表单要求，你说明你的投诉原因，投诉原因下面又分一个二级：具体原因。具体原因决定赔偿金额校验，这些区别在于，某些原因是可以申请赔偿运费的，某些原因是不可以的，这个赔偿金额是由原因决定的。</p>
+<p>这是一个比较简单地场景，还有更复杂的表单，上面的原因可能有三级。</p>
+<p>这个项目，改造的是非常古老淘宝退款项目，累计了8年，现在终于重写了。我当时就想，这么多逻辑规则，需要有一种通用的解决方案。于是，我想到了所谓的mvvm，实在太适合了。mvvm天生适合于复杂的表单逻辑，处理表单联动，主要也就是在于，监控表单改变，然后改变其他表单元素。这样的联动实际上，就是V -&gt; M 然后 M -&gt; V的过程，视图改变，对应的JS改变，改变其他表单视图元素。</p>
+<h3 id="-">约定</h3>
+<p>然后，我开始研究现有的几种mvvm组件，主要看了<a href="http://knockoutjs.com/" target="_blank">knockoutjs</a>, <a href="http://emberjs.com/" target="_blank">emberjs</a>, <a href="https://angularjs.org/" target="_blank">angularjs</a>。首先，我看这些已有的组件我能不能直接用，当时做的是pc端业务，不能放弃IE6，emberjs和angularjs都不能用了，只剩下knockout，但是我也不想用jQuery，在淘宝用的都是KISSY。所以，我就想，那么就自己实现一个吧。</p>
+<p>然后，我主要关注这些已有的组件，他们的使用方式。至于他们怎么实现的，我不是很关注。mvvm的实现，比较重要的是一个东西是view怎么写，在我看来，主要是有两种不同的形式。</p>
+<ol>
+<li>html文档，knockout和angular都是这样的</li>
+<li>JS模板，比如handlebars，ember就是基于handlebars来实现的</li>
+</ol>
+<p>最后，我使用了一种最简单地方案，把ember和knockout实现的结合。定义了几个基本原则，用这种约定的方式来写mvvm模板的语法：</p>
+<ol>
+<li>数据和dom的绑定，通过写一个JS模板语法，{{watch &quot;action: model.var&quot;}}的方式来绑定</li>
+<li>每个绑定占据一个dom节点</li>
+<li>view通过XTemplate模板来写</li>
+</ol>
+<p>下面我来解释一下，整个实现过程：</p>
+<h3 id="-">模板</h3>
+<p>在我做的bidi中，用户首先写的是一段模板：</p>
+<figure class="highlight"><pre><span class="xml"> <span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"bidi-viewer"</span> <span class="attribute">data-view</span>=<span class="value">"user"</span>&gt;</span>
+    <span class="tag">&lt;<span class="title">script</span> <span class="attribute">type</span>=<span class="value">"text/xtemplate"</span>&gt;</span><span class="javascript">
+      &lt;p&gt;hello, I am &lt;strong </span></span><span class="expression">{{<span class="variable">watch</span>  <span class="string">"text: fullName"</span>}}</span><span class="xml"><span class="javascript">&gt;<span class="xml"><span class="tag">&lt;/<span class="title">strong</span>&gt;</span><span class="tag">&lt;/<span class="title">p</span>&gt;</span>
+      <span class="tag">&lt;<span class="title">p</span>&gt;</span>hello, I am <span class="tag">&lt;<span class="title">strong</span> </span></span></span></span><span class="expression">{{<span class="variable">watch</span> <span class="string">"text: firstName"</span>}}</span><span class="xml"><span class="javascript">&gt;<span class="xml"><span class="tag">&lt;/<span class="title">strong</span>&gt;</span><span class="tag">&lt;/<span class="title">p</span>&gt;</span>
+      First Name: <span class="tag">&lt;<span class="title">input</span> </span></span></span></span><span class="expression">{{<span class="variable">watch</span> <span class="string">"value: firstName"</span>}}</span><span class="xml"><span class="javascript">/&gt;<span class="xml"><span class="tag">&lt;<span class="title">br</span>&gt;</span>
+      Last Name: <span class="tag">&lt;<span class="title">input</span> </span></span></span></span><span class="expression">{{<span class="variable">watch</span> <span class="string">"value: lastName"</span>}}</span><span class="xml"><span class="javascript">/&gt;
+      <span class="xml"><span class="tag">&lt;<span class="title">button</span> </span></span></span></span><span class="expression">{{<span class="variable">watch</span> <span class="string">"click: capitalizeLastName"</span>}}</span><span class="xml"><span class="javascript">&gt;Go caps&lt;<span class="regexp">/button&gt;
+    </span></span><span class="tag">&lt;/<span class="title">script</span>&gt;</span>
+  <span class="tag">&lt;/<span class="title">div</span>&gt;</span></span>
+</pre></figure>
+
+<p>这里描述了一段view视图规则，首先，有一个最完成的容器<code>.bidi-viewer</code>，这个容器还通过data-view定义了view所对应的模型。里面是一段模板，包裹在script里面，在js里面，会自动把模板拿出来，和数据放到一起，然后把运算得到的html放到当前视图中去。</p>
+<p>然后，仔细看下这里的绑定是怎么写的：</p>
+<figure class="highlight"><pre><span class="xml"><span class="tag">&lt;<span class="title">strong</span> </span></span><span class="expression">{{<span class="variable">watch</span>  <span class="string">"text: fullName"</span>}}</span><span class="xml"><span class="tag">&gt;</span><span class="tag">&lt;/<span class="title">strong</span>&gt;</span></span>
+</pre></figure>
+
+<p>这里fullName绑定在strong上了，{{watch}}是XTemplate模板的一个自定义函数，后面的是参数。这里有几个细节需要注意，这里的绑定fullName，同时存在strong元素，也许大家会觉得{{fullName}}这样写，不是要有好得多么？angular是这么实现，非常牛叉。但是这样搞的问题在于，绑定一个变量，你的知道这个变量在什么地方，这样当JS这个变量改变的时候，你知道去改dom中哪个元素。</p>
+<p>如果angular那样，你就不能简单的找到这个{{fullName}}具体对应的dom节点了。你得找到这个变量所在的上下文，找到最上层的元素。这样的查找还是非常费事情，所以我选择了最简单的方式，直接一个元素绑定一个变量，通过{{watch}}这样的语法，然后这个自定义函数，返回一个字符串<code>id=bidi-{uid}</code>，这样就非常简单地解决了把view和model关联起来的任务了。</p>
+<p>当然，这也意味着，id是保留属性，每个绑定都不能有id，这个是通过bidi自动生成的。</p>
+<p>这个问题，把view和model联系起来，是mvvm里面，最关健的一步了。</p>
+<h3 id="-">函数</h3>
+<p>前面，主要谈了view怎么写，继续看js怎么写。</p>
+<figure class="highlight"><pre> KISSY.<span class="keyword">use</span>(<span class="string">'gallery/bidi/1.0/index'</span>, <span class="function"><span class="keyword">function</span> <span class="params">(S, Bidi)</span> {</span>
+
+      Bidi.xbind(<span class="string">'user'</span>, {
+        firstName: <span class="string">'Song'</span>,
+        lastName: <span class="string">'Eward'</span>,
+        fullName: <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
+          <span class="keyword">return</span> <span class="keyword">this</span>.<span class="keyword">get</span>(<span class="string">'firstName'</span>) + <span class="string">' '</span> + <span class="keyword">this</span>.<span class="keyword">get</span>(<span class="string">'lastName'</span>);
+        }
+      }, {
+        capitalizeLastName: <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
+          <span class="keyword">var</span> lastName = <span class="keyword">this</span>.<span class="keyword">get</span>(<span class="string">'lastName'</span>).toUpperCase();
+          <span class="keyword">this</span>.<span class="keyword">set</span>(<span class="string">'lastName'</span>, lastName);
+        }
+      });
+
+      Bidi.init();
+})
+</pre></figure>
+
+<p>对于用户而言，使用this.get()和this.set()来赋值。这里有一个问题，就是fullName是一个函数，fullName如何和firstName和lastName关联起来的。</p>
+<p>回到前面的模板，{{watch &quot;text: fullName&quot;}} 这一个运行的时候，我得去取fullName的值，这个时候，会运行执行fullName这个函数，现在，我只需要在fullName执行之前记录一个空数组，然后在fullName执行过程中，所有通过get的变量都记录在那个数组里面就可以了，但fullName执行完毕，我看下这个数组，就知道fullName和哪些变量有关了。</p>
+<p>这种方式加缪提到过，其实看起来很炫，其实实现很挫的方式。这里种方式，有一个大坑，如果出现循环关联，可能就悲剧了。另外，这种方式，函数都必须是同步的，如果在模板中处理异步的，就没法搞了。</p>
+<h3 id="-">实现过程</h3>
+<p>现在，可以把整个流程串起来了。</p>
+<p><img src="https://cloud.githubusercontent.com/assets/452899/3004433/4fa42c68-dd9b-11e3-8402-c7f293f9e5aa.png" alt="image"></p>
+<p>view通过innerHTML获得模板，model通过toJSON方法，获得数据，两者结合，通过XTemplate解析模板。遇到{{watch}}自定义函数的时候，执行绑定，绑定函数同时返回一个dom的id。模板解析后，这些id成为视图上一个个dom节点的id，完成dom渲染，前面的绑定会和dom事件进行绑定。</p>
+<p>在dom区域，有一个#bidi-{uid2}的元素，出发，构成一个V - M - V的绑定循环。bidi-{uid2}元素，是一个input，change事件触发，input的value改变，watch.value方法，监听了dom的change事件，在内部执行<code>this.set(&#39;var&#39;, value)</code>，set方法，触发<code>change:var</code>事件，而watch.text方法，监听了来model内部的change事件，watch.text会修改#bidi-{udi1}元素的innerHTML，这样，一个循环完成。</p>
+<h3 id="-">表单元素</h3>
+<p>前面是一个简单例子，基本的原理，就是这个图片所说的了。实际情况，我得解决业务需求，就前面那种简单地MVVM，还是没法解决表单联动的。这里有一个问题，通常情况，我们是一个变量和一个dom对应，但是对于表单，出了单个变量之外，还有一种集合形式的，这就是radio、checkbox。所以，为了解决这种问题，我把一组radio看做一个变量，和Model对应。这样做，还得定义一个约定。</p>
+<p><img src="http://gtms04.alicdn.com/tps/i4/T1ZvIIFjdkXXamTp3B-751-436.png" alt="form"></p>
+<p>有了这样的约定，就可以这么描述一个联动关系了</p>
+<figure class="highlight"><pre><span class="xml">    <span class="tag">&lt;<span class="title">select</span> <span class="attribute">name</span>=<span class="value">"key1"</span> </span></span><span class="expression">{{<span class="variable">watch</span> <span class="string">"select: problem.defaultValue"</span>&gt;
+      {{<span class="begin-block">#<span class="keyword">each</span> problem.values</span>}}</span><span class="xml"><span class="tag">
+        &lt;<span class="attribute">option</span> <span class="attribute">value</span>=<span class="value">"</span></span></span><span class="expression">{{<span class="variable">value</span>}}</span><span class="xml"><span class="tag"><span class="value">"</span>&gt;</span></span><span class="expression">{{<span class="variable">text</span>}}</span><span class="xml"><span class="tag">&lt;/<span class="title">option</span>&gt;</span>
+      </span><span class="expression">{{<span class="end-block">/<span class="keyword">each</span></span>}}</span><span class="xml">
+    <span class="tag">&lt;/<span class="title">select</span>&gt;</span>
+    <span class="tag">&lt;<span class="title">div</span>&gt;</span>
+      </span><span class="expression">{{<span class="begin-block">#watch </span><span class="string">"linkage: reasons.values: problem"</span> <span class="string">"radio: reasons.defaultValue"</span>}}</span><span class="xml">
+        <span class="tag">&lt;<span class="title">label</span> <span class="attribute">class</span>=<span class="value">"radio-inline"</span>&gt;</span> <span class="tag">&lt;<span class="title">input</span> <span class="attribute">type</span>=<span class="value">"radio"</span> <span class="attribute">value</span>=<span class="value">"</span></span></span><span class="expression">{{<span class="variable">value</span>}}</span><span class="xml"><span class="tag"><span class="value">"</span>/&gt;</span></span><span class="expression">{{<span class="variable">text</span>}}</span><span class="xml"> <span class="tag">&lt;/<span class="title">label</span>&gt;</span>
+      </span><span class="expression">{{<span class="end-block">/watch</span>}}</span><span class="xml">
+    <span class="tag">&lt;/<span class="title">div</span>&gt;</span></span>
+</pre></figure>
+
+<h3 id="-">优点</h3>
+<p>优势还是蛮多的，最方便的是，处理开发各种诡异的需求，简单多了。举个例子，开发说，二级原因被选中的时候，需要发一个异步请求，然后获得三级原因，然后现实三级原因。比如，他们经常说，哎呀，这个二级原因的文本也得给我，放隐藏域里吧。这样的需求，对于我而言，不是很复杂，稍微改下模板，不用动其他业务逻辑。</p>
+<h3 id="-">缺点</h3>
+<p>缺陷同样蛮多的，最开始做这个的时候，我觉得还慢不错的。但是，当我听到react的分享后，我瞬间觉得这个东东弱爆了。下面讲讲问题：</p>
+<ol>
+<li><p>一个变量绑定一个dom的方式，看起来很简单，也很美好。但现实要骨感得多，比如，一个表单元素，当某个二级原因选中的时候，这一行表单元素需要隐藏，实现这个，要做的涉及到很多改动，第一，这个表单元素需要隐藏起来，同时表单本身需要被disabled，不能直接被删掉，也许什么时候，这个元素又要出来了。也就是，一个变量的修改，可能涉及到很多dom的修改，这直接去修改dom，还是比较浪费的。</p>
+</li>
+<li><p>与其他JS组件沟通的问题，MVVM通常直接与dom绑定，但是有些其他组件，比如表单元素模拟的组件，也要处理表单，经过模拟的表单元素，你甚至看不到表单元素了，这样的问题还是不好解决的。</p>
+</li>
+<li><p>模块粒度问题，bidi没法处理view嵌套的情况。这个问题，其实不算大问题，如果能够处理好view的嵌套，就可以做出webcompement了，angular在往这个方向发展。但是做得还是不够好，我觉得上面我遇到的问题，react都能解决。</p>
+</li>
+</ol>
+<p>最好讲讲react，当我听到react杀手锏是，自己定义了一套虚拟的dom，这个dom和html文档里面的dom进行沟通。JS本身不直接接触dom，而是虚拟的dom。这样的好处，可以随时随地修改dom，但是这些操作不会直接对dom进行改动，统一通过visual dom映射到dom中。这其实在dom操作和js中间，搭建了一个桥，所有的操作首先放到桥上，然后整理一下，用最快的方式，在dom中操作。</p>
+<p>另外，一个大多数mvvm或者其他web compemnt组件所做不到的是，visual dom是JS实现的，所以，react可以在服务器端跑，这样一来，页面不仅仅可以同时在前后端渲染了。这是非常非常好的特性了。</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/mvvm/" class="post__tag__link">mvvm</a></li></ul><a href="/2014/05/17/how-to-reliaze-mvvm--bidi/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2014-05-17T07:50:45.000Z" class="post__time">May 17, 2014</time><h1 class="post__title"><a href="/2014/05/17/about-vim/">再谈vim</a></h1></header><div class="post__main"><p>一年前谈到vim，现在过去了这么久，开始接触一些其他编辑器，有了新的看法，在此记录一下。</p>
+<p>vim有相对于其他编辑器的优势，同样，有很多缺点。我觉得说vim要比ide好，这是不对的，vim好用，其他编辑器同样好用，甚至更好用。</p>
+<p>我感觉，vim适合开发前端，但肯定不一定适合其他语言，比如java。</p>
+<p>下面说说对于这个问题的感受：</p>
+<p>第一，vim对硬件没有要求</p>
+<p>最初使用vim，只是因为我的第一台个人电脑(一个10寸的上网本)，能够跑起来的编辑器只有vim，没有办法，只能硬着头皮作下去。然后就这样，4年过去了，现在用的mac air，同样是最低配的，chrome ＋ eclipse基本上就很卡很卡了，vim还是完全没有问题。也许对于很多人而言，硬件不是问题，但是vim让你对硬件没有要求，这点很重要，有时候对硬件的需求像是永远填补不满的欲望。</p>
+<p>俗话说，穷人家的孩子早当家。能够适应恶劣的硬件环境，从长远反正来看，是一种修行的必须经历的过程。</p>
+<p>第二，vimscript</p>
+<p>用得越多，我越觉得vimscript是vim最好的地方。</p>
+<p>如果说到语言的比较，大多数程序员会撸起衣袖，相互拉扯，磨刀霍霍的气势。每个人觉得自己用的语言是最完美的，但是如果说vimscript是垃圾语言，没有人会反对。</p>
+<p>确实，从语言角度来看，vimscript太弱了。但是，在jQuery出现之前，在javasciprt the good parts出现之前，大家同样觉得javascript是垃圾语言。vimscript作为编辑器内置的语言，是很好用的。用一句话来说，就是vim is vimscript。</p>
+<p> 我觉得一门语言是否好，要看它是否好用，是否适合它所运行的环境。vim里的所有操作，都是vimscript。这一点很重要，很多人觉得要记住那么多的快捷键，非常麻烦，实际上，你可以把操作vim看做是编程过程。因为，操作vim，就是写vimscript的过程，作为程序员，学习一门语言应该不是难事。</p>
+<p>把操作vim当初编程，我们首先得学习这门语言的基础只是，在vim就是vim配置文件，还有基本的操作，模式等。学会这些基本没什么问题，有vimtutor。后面真正用上vim来写代码，你会有一种感觉，关于如何使用vim的知识，是永远学不完的。</p>
+<p>最近，经常有人拿vim和sublime比较，sublime学到了vim的轻巧，同样有IDE的简单。相比而言，vim似乎要繁琐，无聊得多。实际上，这就是vim的风格，你需要花很多经历去学习，去折腾，受到挫折。其他编辑器强调的是一体化，功能定制好，sublime上手只需要一天，你不需要去折腾什么，一切都很好了，IDE也同样如此。</p>
+<p>两者的主要区别的，vim你需要会写程序，而后者，只需要学会配置文件就行了，甚至配置都是可视化的。有人说，sublime之类的，我们关注的是写代码本身，而不需要关注编辑器，用vim，你得同时操作一门语言，一些繁琐毫无意义得快捷键。</p>
+<p>从我的角度而言，操作vim的过程和写代码本身是一种事情，作为程序员，有一种程序可以用来操作正在写的代码，这不是很有趣的事情吧。在程序员的世界了，程序拥有最高的自由，在vim里，写程序的过程是自由的。那些其他人看起来无意义的快捷键，对于我而言是有意义的。就像代码对于非程序员而言就像天书一样，但程序员会觉得很美。</p>
+<p>总结一下：</p>
+<p>现代的编辑器，都非常优秀，有时候在折腾了一整天的vim插件后，我非常沮丧，觉得vim没救了。后来我慢慢的明白了，试图让vim做所有事情，是不现实的。慢慢的，我也不再推荐其人用vim了，这种折腾过程，有时候还是挺痛苦的，自由的代价，可能不是所有人都喜欢这样。如果有足够的时间，比如是大学生，还是很值得体验一下vim的。</p>
+<p>一旦能够享受vim给的自由，你会爱不释手的。其他编辑器虽然很好，很舒服，但那都是别人的编辑器，你永远驯服不了。这是我对这个问题对回答，vim的优势所在。</p>
+<p>最后推荐两个资料</p>
+<ol>
+<li>vimscript<a href="http://learnvimscriptthehardway.stevelosh.com/" target="_blank">教程</a>。非常优秀的教程，打算深入学习vim的可以看看，vim文档虽然很详细，但是太零散了，这本书系统的讲解vimscript。另外，非常喜欢这个书名，Learn Vimscript the hard way，the hard way对于vim来说，太适合了。</li>
+<li>vimcasts.org，一个关于vim的播客，分享一些很多很玄很酷的技巧，推荐被vim折腾过的人看看，可以大大增加你继续学习下去的信心。</li>
+</ol>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/vim/" class="post__tag__link">vim</a></li></ul><a href="/2014/05/17/about-vim/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2014-03-19T12:01:13.000Z" class="post__time">March 19, 2014</time><h1 class="post__title"><a href="/2014/03/19/find-some-bugs/">改过的bug</a></h1></header><div class="post__main"><p>最近改了两个bug，记录一下。</p>
 <h2 id="-">第一个，表单提交问题</h2>
 <p>在售后页面，表单有比较复杂的，逻辑，包括模拟select，select选择提示效果，uploader，复杂校验，表单元素之间逻辑交互。</p>
 <h3 id="-">问题描述</h3>
 <p>上周五，开发说，线上有很多IE8用户数据没有通过前端校验，直接提交到后端，导致很多报错。我研究了很久，最后，发现问题是，校验失效了。</p>
 <h3 id="-">分析</h3>
-<p>直接原因是，整个校验还是有，但是校验失败的情况下，表单还是提交了。在chrome，因为剑平的Auth是基于html5校验的，所以，表单提交动作被拦截了。造成似乎只有IE8有这个问题的假象，从这点看，这次的问题因为剑平Auth选择使用html5标准，从而问题较少了不少。</p>
+<p>直接原因是，整个校验还是有，但是校验失败的情况下，表单还是提交了。在chrome，因为剑平的Auth是基于html5校验的，所以，表单提交动作被拦截了。造成似乎只有IE8有这个问题的假象，从这点看，这次的问题因为剑平Auth选择使用html5标准，从而问题较少了不少。</p>
 <p>继续分析源码，发现问题是以前整个表单的提交动作是由js来完成的，通过submit()函数提交。当Auth的校验通过之后，会提交表单。而现在这个页面的点击按钮由原来的div，变成了button，在一个表单中，button默认是submit类型的。</p>
 <h3 id="-">结论</h3>
 <p>提交按钮由div变成button了，导致页面直接被提交了。我离开把这个button改成div，让开发马上发模板。后来听说，这个改动是玉门改的，当时有个日常需求需要的。不过想想，div作为提交的按钮，确实容易引起误解，改成button，也蛮正常的，只是，这个页面的提交逻辑封装在一个gallery组件里。新接手的时候，难免不清楚这样的逻辑。</p>
@@ -23,18 +149,18 @@
 <p>Bidi的调试，一直是个非常头痛的问题，上次玉门发现一个bug，找我看了好久，我最后凭感觉找到一个隐藏的bug。这里涉及到Bidi里面的model和view(dom)，另外还有剑平的模拟选择框，三个对象都可以能有问题。select的改变犹如一个黑盒，时间绑定一方面完全解绑了发布事件者和事件订阅之间的联系，同时这种解耦导致调试非常麻烦，你完全不知道是在什么情况下处罚了某一事件。</p>
 <p>这时候，我想到了bidi曾经遇到一个问题，Firefox的Object下有一个方法watch，这个watch是火狐独有的方法，基本没什么用。不过能够监控变量被修改，这个可以之间从前面的黑盒中找到问题发生的现场。</p>
 <p>有了这个思路，就好办了。首先，点击修改后“退款原因”被修改了，那么一定会映射到对应的js变量<code>reasons.defaultValue</code>上，只需要监控谁在修改了<code>reasons.defaultValue</code>。然后，写下watch函数的是实现：</p>
-<figure class="highlight"><pre>  <span class="function"><span class="keyword">function</span> <span class="title">watch</span><span class="params">(obj, property)</span>{</span>
+<figure class="highlight js"><pre>  <span class="function"><span class="keyword">function</span> <span class="title">watch</span><span class="params">(obj, property)</span>{</span>
 
     <span class="comment">// 通过闭包，存贮value</span>
     <span class="keyword">var</span> nowVal = obj[property];
 
     <span class="keyword">return</span> <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
 
-      Object.defineProperty(obj, property, {
-        <span class="keyword">get</span>: <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
+      <span class="built_in">Object</span>.defineProperty(obj, property, {
+        get: <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
           <span class="keyword">return</span> nowVal;
         },
-        <span class="keyword">set</span>: <span class="function"><span class="keyword">function</span><span class="params">(v)</span>{</span>
+        set: <span class="function"><span class="keyword">function</span><span class="params">(v)</span>{</span>
           <span class="comment">// 设置一个断点，查看变量被修改的场景</span>
           debugger
           nowVal = v;
@@ -62,10 +188,11 @@
 <p><strong> 说明 </strong>：本文是Github全站部署CSP策略过程总结的经验。总体上，CSP安全策略很大程度上解决了JS非同源策略引起的问题，通过JS加载源白名单机制，能够很好的保护用户。</p>
 <p>作为前端，CSP策略所提倡的方案，都是JS和CSS规范的方案，CSP所做的是完全抛弃不规范内联JS写法，只要我们稍微注意就能够做到了，而且这也是一个专业的前端应该做到的。</p>
 <p>另外，框架开发者也应该考虑CSP兼容的问题了，测试过程很简单</p>
-<figure class="highlight"><pre>&lt;?php
-//header(<span class="attribute">'Content</span>-Security-Policy: <span class="keyword">default</span>-src *; <span class="keyword">report</span>-uri /csp/recode.php');
+<figure class="highlight php"><pre><span class="preprocessor">&lt;?php</span>
+<span class="comment">//header('Content-Security-Policy: default-src *; report-uri /csp/recode.php');</span>
 header(<span class="string">"X-Frame-Options: SAMEORIGIN"</span>);
 header(<span class="string">"Content-Security-Policy: default-src *; script-src 'self' g.tbcdn.cn"</span>);
+<span class="preprocessor">?&gt;</span>
 </pre></figure>
 
 <hr>
@@ -75,7 +202,7 @@ header(<span class="string">"Content-Security-Policy: default-src *; script-src 
 <h2 id="-">准备好你的应用服务器</h2>
 <h3 id="csp-header">CSP header</h3>
 <p>在Rails应用激活CSP是轻松的，它只是一句简单的头信息。你不需要引入任何其他库；设置一个before filter就够了(译注：before filter应该是请求处理前置的hook)。</p>
-<figure class="highlight"><pre>before_filter <span class="symbol">:set_csp</span>
+<figure class="highlight ruby"><pre>before_filter <span class="symbol">:set_csp</span>
 
 <span class="function"><span class="keyword">def</span> </span>set_csp
   response.headers[<span class="string">'Content-Security-Policy'</span>] = <span class="string">"default-src *; script-src https://assets.example.com; style-src https://assets.example.com"</span>
@@ -89,7 +216,7 @@ header(<span class="string">"Content-Security-Policy: default-src *; script-src 
 <h3 id="-">内联脚本</h3>
 <p>除非设置了<code>unsafe-inline</code>，所有的内联脚本标签都会被拦截。这是实现你想要的XSS防御的主要手段。</p>
 <p>大部分内嵌的脚本都是用来配置页面属性的。</p>
-<figure class="highlight"><pre><span class="tag">&lt;<span class="title">script</span> <span class="attribute">type</span>=<span class="value">"text/javascript"</span>&gt;</span><span class="javascript">
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">script</span> <span class="attribute">type</span>=<span class="value">"text/javascript"</span>&gt;</span><span class="javascript">
 GitHub.user = <span class="string">'josh'</span>
 GitHub.repo = <span class="string">'rails'</span>
 GitHub.branch = <span class="string">'master'</span>
@@ -97,15 +224,15 @@ GitHub.branch = <span class="string">'master'</span>
 </pre></figure>
 
 <p>更好地方式是以下代码展示的，把配置信息放在<code>data-*</code>的属性中。</p>
-<figure class="highlight"><pre><span class="subst">&lt;</span>div <span class="built_in">data</span><span class="attribute">-user</span><span class="subst">=</span><span class="string">"josh"</span> <span class="built_in">data</span><span class="attribute">-repo</span><span class="subst">=</span><span class="string">"rails"</span> <span class="built_in">data</span><span class="attribute">-branch</span><span class="subst">=</span><span class="string">"master"</span><span class="subst">&gt;</span>
-<span class="subst">&lt;</span>/div<span class="subst">&gt;</span>
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">div</span> <span class="attribute">data-user</span>=<span class="value">"josh"</span> <span class="attribute">data-repo</span>=<span class="value">"rails"</span> <span class="attribute">data-branch</span>=<span class="value">"master"</span>&gt;</span>
+<span class="tag">&lt;/<span class="title">div</span>&gt;</span>
 </pre></figure>
 
 
 <h3 id="-">内联事件绑定</h3>
 <p>和内联脚本标签一样，内联的事件绑定也过时了。</p>
 <p>如果你在2008年之后写过JS，你大概会使用一种不那么直接的方式绑定事件。但是在你的代码库里面，可能还隐藏着一些内联的事件绑定。</p>
-<figure class="highlight"><pre><span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">""</span> <span class="attribute">onclick</span>=<span class="value">"handleClick();"</span>&gt;</span><span class="tag">&lt;/<span class="title">a</span>&gt;</span>
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">""</span> <span class="attribute">onclick</span>=<span class="value">"handleClick();"</span>&gt;</span><span class="tag">&lt;/<span class="title">a</span>&gt;</span>
 <span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">"javascript:handleClick();"</span>&gt;</span><span class="tag">&lt;/<span class="title">a</span>&gt;</span>
 </pre></figure>
 
@@ -114,7 +241,7 @@ GitHub.branch = <span class="string">'master'</span>
 </pre></figure>
 
 <p>将会输出</p>
-<figure class="highlight"><pre><span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">"/"</span> <span class="attribute">data-confirm</span>=<span class="value">"Are you sure?"</span>&gt;</span>Delete<span class="tag">&lt;/<span class="title">a</span>&gt;</span>
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">"/"</span> <span class="attribute">data-confirm</span>=<span class="value">"Are you sure?"</span>&gt;</span>Delete<span class="tag">&lt;/<span class="title">a</span>&gt;</span>
 </pre></figure>
 
 <p>你需要使用UJS引擎，比如<a href="https://github.com/rails/jquery-ujs" target="_blank">jquery-ujs</a>或者<a href="https://github.com/josh/rails-behaviors" target="_blank">rails-behaviors</a>，通过配置data属性来实所有的效果。</p>
@@ -125,18 +252,18 @@ GitHub.branch = <span class="string">'master'</span>
 <h3 id="-css">行内CSS</h3>
 <p>除非<code>style-src</code>定义了<code>unsafe-inline</code>，否则所有的html中style属性都是无效的。</p>
 <p>最常用于控制元素加载时隐藏的方式如下</p>
-<figure class="highlight"><pre>&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
-&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span> style=<span class="string">"display:none"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
-&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span> style=<span class="string">"display:none"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
+<span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab"</span> <span class="attribute">style</span>=<span class="value">"display:none"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
+<span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab"</span> <span class="attribute">style</span>=<span class="value">"display:none"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
 </pre></figure>
 
 <p>更好的方式是使用CSS状态的class</p>
-<figure class="highlight"><pre>&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab selected"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
-&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
-&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab selected"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
+<span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
+<span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
 </pre></figure>
 
-<figure class="highlight"><pre><span class="class">.tab</span> <span class="rules">{ <span class="rule"><span class="attribute">display</span>:<span class="value"> none </span></span></span>}
+<figure class="highlight css"><pre><span class="class">.tab</span> <span class="rules">{ <span class="rule"><span class="attribute">display</span>:<span class="value"> none </span></span></span>}
 <span class="class">.tab</span><span class="class">.selected</span> <span class="rules">{ <span class="rule"><span class="attribute">display</span>:<span class="value"> block </span></span></span>}
 </pre></figure>
 
@@ -167,10 +294,10 @@ GitHub.branch = <span class="string">'master'</span>
 <p>这是非常必要的，比如你希望在你的网站上实现一个需要动态绝对定位的自定义提示条效果(译注：提示条需要改变left和top值)。</p>
 <p>对于行内CSS序列化实现还是有一些bug(译注：CSS规则序列化的结果输出为<a href="http://dev.w3.org/csswg/cssom/#dom-cssrule-csstext" target="_blank">cssText</a>，序列化过程指cssText转换为CSSOM的解析过程).</p>
 <p>一个bug具体的例子是克隆一个有CSS属性元素(译注：这个bug已经修复了).</p>
-<figure class="highlight"><pre><span class="built_in">var</span> el <span class="subst">=</span> document<span class="built_in">.</span>createElement(<span class="string">'div'</span>);
-el<span class="built_in">.</span>style<span class="built_in">.</span>display <span class="subst">=</span> <span class="string">'none'</span>
-el<span class="built_in">.</span>cloneNode(<span class="literal">true</span>);
-<span class="subst">&gt;</span> Refused <span class="keyword">to</span> apply <span class="keyword">inline</span> style because it violates the following Content Security Policy directive: <span class="string">"style-src http://localhost"</span><span class="built_in">.</span>
+<figure class="highlight js"><pre><span class="keyword">var</span> el = document.createElement(<span class="string">'div'</span>);
+el.style.display = <span class="string">'none'</span>
+el.cloneNode(<span class="literal">true</span>);
+&gt; Refused to apply inline style because it violates the following Content Security Policy directive: <span class="string">"style-src http://localhost"</span>.
 </pre></figure>
 
 <p>同时，正如前面提到过得，像jQuery和Modernizr这种类库执行一些浏览器特性侦探的时候，在页面注入一些自定义的样式用于测试，可能会引起异常。但愿这些问题能够被这些组件自己去解决。</p>
@@ -560,336 +687,7 @@ JSONElementList :
 <p>在此，对于来向我求助的同学们申明，我非常乐于提供力所能及的帮助。<strong>网络让信息在世界畅通无阻，我们可以因此而迷失于对无限信息拥有的贪婪追求中，也可以选择与世界共享</strong>。作为开源社区爱好者，享受着无数开源社区成员的努力的成果，能够用与他人分享一些我的小小的经验，也算是对于开源精神的一种支持回报吧。</p>
 <p>在最近有一些来信我没有回复，在此表示抱歉。前一段时间在Ubuntu上溜达，无法整SPSS，而且也好久没有动统计的东东了，我只是一个稍微懂一些心理学统计的本科生，在此也只介绍一些基本的SPSS统计初步过程，再往后的路就得大家自己走了。每个专业有其合适的统计原理与方法，对于社会科学数据的统计，研究者的检验比统计技术更重要。</p>
 <p>我认为，SPSS统计的基本过程是这样的：安装SPSS软件——&gt;把数据以合适的方式导入SPSS中——&gt;选择统计方法，使用SPSS计算（选择方法靠专业经验啦，SPSS如何计算<strong>参考电子书）——**</strong>&gt;**结果分析。最重要的是选择方法和结果分析，其他的根本不需要专业知识，仅仅计算机技术而言。希望我的说明能过对大家在这些方面有所帮助。</p>
-</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/spss/" class="post__tag__link">spss</a></li></ul><a href="/2010/09/24/spss-install/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-07-16T07:30:52.000Z" class="post__time">July 16, 2010</time><h1 class="post__title"><a href="/2010/07/16/hierarchical-data-show-in-html/">树结构数据的html展示实现</a></h1></header><div class="post__main"><p>网页中经常会需要展示一些树结构数据，而现在流行的关系型数据库（比如MySQL）都是以二位的数据形式贮存，对于通常用到的树结构需要转化为二维关系来放在数据库中。关于树结构数据的贮存，Mike Hillyer一文<a href="http://dev.mysql.com/tech-resources/articles/hierarchical-data.html" target="_blank">Managing Hierarchical Data in MySQL</a>有非常详细的描述。</p>
-<p>Mike Hillyer提出两种方式：</p>
-<p>1、毗邻目录模式(adjacency list model)</p>
-<p>2、预排序遍历树算法(modified preorder tree traversal algorithm)</p>
-<p>虽然两种方式很好地实现了数据存储过程，但网页显示还需要做得更多。本文仅仅探讨树结构数据的展示部分。</p>
-<p>Mike Hillyer的两种模式中，第二种是直接把数据的结构关系转存起来，数据的展示不存在问题（具体细节参考原文）。第一数据结构的存在更容易理解，所以似乎被更多人采用。这种方法的原理是把每个数与其父节点数据的一个标识符一起贮存在一列中，然后就像摸着石子过河一样，找到一个点然后可以得到前一个点（或者后一个点），然后所有的点就都可以穿在一起了。这种方法有些数学中数学归纳法的意味，它的好处在于存储数据时非常清晰——只需要处理数据本身和父节点的关系，而且可扩展性好，数据所处理的关系越少，这大概就是软件所强调的松耦合思想吧。当然这种方法的代价是低效率的查询，通常无法确定整个树的深度，这就需要使用递归查询来获得数据，递归查询数据库对于系统资源的消耗是非常巨大的。此外还有一个致命的缺陷，修改数据时容易出现节点闭合的情况，也就是这些数据围成了一个圈，如下图所示</p>
-<figure class="highlight text"><pre><span class="comment">1</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">&gt;2</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">&gt;4</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">&gt;5</span>
-<span class="comment">|</span>                    <span class="comment">|</span>
-<span class="comment">1&lt;</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">8&lt;</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">7&lt;</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="literal">-</span><span class="comment">6</span>
-</pre></figure>
-
-<p>1后面的自带元素永远不知道它们起源于1整个节点，一旦出现这种情况就会到时递归查询进入死循环，所以存储过程一定要对数据进行合理性检验（就像结婚需要避免血缘关系）。当然在做中小型网站时，这种方法还是非常好的，而且在数据变换不是很大时可以使用缓存来解决循环查询的问题。</p>
-<p>在生产html展示页时，首先要完成的是从数据库中提取数据，并且转换为树结构。假设有如下数据：</p>
-<figure class="highlight"><pre><span class="code">+-------------+</span>----------------------<span class="code">+--------+</span>
-<span class="header">|          id | name                 | parent |
-+-------------+----------------------+--------+</span>
-|           1 | 1                    |      0 |
-|           2 | 2                    |      0 |
-|           3 | 3                    |      0 |
-|           4 | 4                    |      2 |
-|           5 | 5                    |      2 |
-|           6 | 6                    |      3 |
-|           7 | 7                    |      3 |
-|           8 | 8                    |      6 |
-<span class="header">|           9 | 9                    |      6 |
-+-------------+----------------------+--------+</span>
-</pre></figure>
-
-<p>第一列id为一组数据的标识。用集合来描述这列数据是{1,2{4,5},3{6{8,9},7}},如下图：</p>
-<p><img src="/assets/images/tree.jpg" alt="树结构图" title="树结构图"></p>
-<p>如果上图依次标上数字，就成为了预排序遍历树算法模式的贮存了，看到如此结构自然想到用在PHP中可以使用如此数组来表示</p>
-<figure class="highlight"><pre><span class="keyword">array</span>(<span class="number">1</span>,<span class="number">2</span>,<span class="keyword">array</span>(<span class="number">4</span>,<span class="number">5</span>),<span class="number">3</span>,<span class="keyword">array</span>(<span class="number">6</span>,<span class="keyword">array</span>(<span class="number">8</span>,<span class="number">9</span>),<span class="number">7</span>));
-</pre></figure>
-
-<p>于是尝试了一下如下的测试</p>
-<figure class="highlight"><pre><span class="function"><span class="keyword">function</span> <span class="title">unlimitedSortTest</span><span class="params">()</span>
-{</span>
-    <span class="variable">$arrSort</span> = <span class="keyword">array</span>(
-        <span class="keyword">array</span>(<span class="number">1</span>,<span class="number">0</span>),
-        <span class="keyword">array</span>(<span class="number">2</span>,<span class="number">0</span>),
-        <span class="keyword">array</span>(<span class="number">3</span>,<span class="number">0</span>),
-        <span class="keyword">array</span>(<span class="number">4</span>,<span class="number">2</span>),
-        <span class="keyword">array</span>(<span class="number">5</span>,<span class="number">2</span>),
-        <span class="keyword">array</span>(<span class="number">6</span>,<span class="number">3</span>),
-        <span class="keyword">array</span>(<span class="number">7</span>,<span class="number">3</span>),
-        <span class="keyword">array</span>(<span class="number">8</span>,<span class="number">6</span>),
-        <span class="keyword">array</span>(<span class="number">9</span>,<span class="number">6</span>)
-    );
-    <span class="variable">$arrResult</span> = <span class="keyword">array</span>(
-        <span class="number">1</span>,<span class="number">2</span>,<span class="keyword">array</span>(<span class="number">4</span>,<span class="number">5</span>),<span class="number">3</span>,<span class="keyword">array</span>(<span class="number">6</span>,<span class="keyword">array</span>(<span class="number">8</span>,<span class="number">9</span>),<span class="number">7</span>)
-    );
-    <span class="variable">$this</span>-&gt;unit-&gt;run(<span class="variable">$this</span>-&gt;_listToTree(<span class="variable">$arrSort</span>),<span class="variable">$arrResult</span>,<span class="string">'分类数据生成测试'</span>);
-}
-</pre></figure>
-
-<p>依然是使用CI的单元测试类，实现如此算法甚是折腾，一共使用了三个函数，一个作为借口函数调入数据，一个函数通过递归方式遍历所有节点，把数据与数据的深度标识依次存入一个数组中，最后一个函数获取子节点的元素，如果子节点函数返回书为空，递归循环退出。这种方式实现得非常简陋，于数据库结合，需要首先把数据库数据直接提取，然后存入一个数组。事实上，这返回的数据也无法得到上面测试想要得到的结果，数据的展示只需要可以明显看出数据之间的继承关系就可以。最后得到一个如下图的options</p>
-<select  name="tests">
-<option value="0">1</option>
-<option value="10">　11</option>
-<option value="11">　12</option>
-<option value="20">　　21</option>
-<option value="30">　　　31</option>
-<option value="40">　　　　41</option>
-<option value="41">　　　　42</option>
-<option value="42">　　　　43</option>
-<option value="32">　　　32</option>
-<option value="33">　　　33</option>
-<option value="34">　　　34</option>
-<option value="22">　　22</option>
-<option value="23">　　23</option>
-<option value="13">　13</option>
-<option value="14">　14</option>
-<option value="2">2</option>
-<option value="3">3</option>
-<option value="4">4</option>
-</select>
-
-<p>使用空白缩进深度作为树结构的描述方式，看来还是非常不爽，展示得毕竟非常勉强。后来无意中看到另外一种更合适的，真正的树结构：</p>
-<select id="role_parents" class="valid" name="role_parents"> <option disabled="disabled" selected="selected" value="label">父级组</option> <option value="网站管理员">网站管理员</option> <option value="测试者11"> ├ 测试者11</option> <option value="测试者21"> ├ 测试者21</option> <option value="测试者2"> │ └ 测试者2</option> <option value="测试者32"> ├ 测试者32</option> <option value="测试者12"> │ ├ 测试者12</option> <option value="测试者1"> │ └ 测试者1</option> <option value="测试者"> └ 测试者</option> </select>
-
-<p>于是又探索起来这种形式的生成过程。最终还是使用了循环查询方法，并且实现了从任意节点获取树的方法getTree，并且还有一个比较关系是否合适的函数_notChildOf。这里只有一个属性db为继承自CI的Model类，转换为其他数据库操作类也非常容易。Ok，就这样啦，最后，除了可以生成上面的选择器，还可以借助比如jQuery的table-tree插件，生成表格数据的树结构。上面Category类中，getTree函数得到的数组中，数组key值就是用来表示数据在整个书中的关系(密码在getChild中的$j中)。</p>
-<figure class="highlight"><pre><span class="comment">/**
- *
- * 分类模型父类
- * 在数据库中结构为
- * id       childName       parentName
- * -----------------------------------
- *  1       栏目1           root
- *  2       栏目2           栏目1
- *
- */</span>
-
-<span class="class"><span class="keyword">class</span> <span class="title">CategoryModel</span> <span class="keyword">extends</span> <span class="title">Model</span>{</span>
-
-    <span class="comment">/**
-     *
-     * 父节点名，对应为数据库中字段
-     *
-     *<span class="phpdoc"> @var</span> string
-     */</span>
-    <span class="keyword">protected</span> <span class="variable">$_parent</span>;
-
-    <span class="comment">/**
-     *
-     * 子节点名，对应为数据库中字段
-     *
-     *<span class="phpdoc"> @var</span> string
-     */</span>
-    <span class="keyword">protected</span> <span class="variable">$_child</span>;
-
-    <span class="comment">/**
-     *
-     * 更节点名
-     *
-     *<span class="phpdoc"> @var</span> string
-     */</span>
-    <span class="keyword">protected</span> <span class="variable">$_root</span>;
-
-    <span class="comment">//整体树结构缓存</span>
-    <span class="keyword">protected</span> <span class="variable">$_tree</span>;
-
-    <span class="keyword">public</span> <span class="variable">$table</span>;
-
-    <span class="comment">/**
-     *
-     * 重载Datamapper构造函数
-     *
-     */</span>
-    <span class="function"><span class="keyword">function</span> <span class="title">__construct</span><span class="params">()</span>
-    {</span>
-        <span class="keyword">parent</span>::__construct();
-    }
-
-    <span class="comment">/**
-     *
-     * 获取树结构，以数组形式展现
-     *<span class="phpdoc"> @param</span> $root string 树起点名
-     *<span class="phpdoc"> @return</span> array
-     */</span>
-    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">getTree</span><span class="params">(<span class="variable">$root</span> = NULL)</span>
-    {</span>
-        <span class="variable">$tree</span> = <span class="variable">$this</span>-&gt;getChild(<span class="variable">$root</span>);
-        <span class="variable">$treeNode</span> = <span class="keyword">array</span>();
-
-        <span class="keyword">if</span>(!<span class="keyword">empty</span>(<span class="variable">$tree</span>))
-        {
-            <span class="variable">$parents</span> = array_keys(<span class="variable">$tree</span>);
-            <span class="variable">$children</span> = array_values(<span class="variable">$tree</span>);
-
-            <span class="keyword">foreach</span>(<span class="variable">$children</span> <span class="keyword">as</span> <span class="variable">$key</span> =&gt; <span class="variable">$child</span>)
-            {
-                <span class="variable">$parent</span> = explode(<span class="string">'-'</span>,<span class="variable">$parents</span>[<span class="variable">$key</span>]);
-                <span class="variable">$parentNext</span> = <span class="keyword">isset</span>(<span class="variable">$parents</span>[<span class="variable">$key</span> + <span class="number">1</span>])?explode(<span class="string">'-'</span>,<span class="variable">$parents</span>[<span class="variable">$key</span>+<span class="number">1</span>]):<span class="keyword">NULL</span>;
-                <span class="variable">$level</span> = <span class="variable">$parent</span>[<span class="number">1</span>];
-                <span class="variable">$levelNext</span> = <span class="variable">$parentNext</span> ? <span class="variable">$parentNext</span>[<span class="number">1</span>]:<span class="keyword">NULL</span>;
-
-                <span class="keyword">if</span>(<span class="variable">$level</span> == <span class="number">0</span>)
-                {
-                    <span class="variable">$treeNode</span>[<span class="variable">$child</span>] = <span class="variable">$child</span>;
-                }
-                <span class="keyword">elseif</span>(<span class="variable">$level</span> &gt; <span class="number">0</span> <span class="keyword">AND</span> <span class="variable">$levelNext</span> <span class="keyword">AND</span> <span class="variable">$levelNext</span> &gt;= <span class="variable">$level</span>)
-                {
-                    <span class="variable">$treeNode</span>[<span class="variable">$child</span>] = <span class="string">'&amp;nbsp;'</span>.str_repeat(<span class="string">'│&amp;nbsp;'</span>,<span class="variable">$level</span>-<span class="number">1</span>).<span class="string">'├&amp;nbsp;'</span>.<span class="variable">$child</span>;
-                }
-                <span class="keyword">else</span>
-                {
-                    <span class="variable">$treeNode</span>[<span class="variable">$child</span>] = <span class="string">'&amp;nbsp;'</span>.str_repeat(<span class="string">'│&amp;nbsp;'</span>,<span class="variable">$level</span>-<span class="number">1</span>).<span class="string">'└&amp;nbsp;'</span>.<span class="variable">$child</span>;
-                }
-            }
-        }
-
-        <span class="keyword">return</span> <span class="variable">$treeNode</span>;
-    }
-
-    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">getParent</span><span class="params">(<span class="variable">$target</span> = <span class="string">''</span>,&amp;<span class="variable">$nodeTree</span> = array<span class="params">()</span>)</span>
-    {</span>
-        <span class="keyword">if</span>(<span class="variable">$target</span> == <span class="variable">$this</span>-&gt;_root)
-        {
-            <span class="variable">$nodeTree</span>[] = <span class="variable">$target</span>;
-        }
-        <span class="keyword">else</span>
-        {
-            <span class="variable">$this</span>-&gt;db-&gt;select(<span class="variable">$this</span>-&gt;_parent.<span class="string">','</span>.<span class="variable">$this</span>-&gt;_child);
-
-            <span class="variable">$query</span> = <span class="variable">$this</span>-&gt;db-&gt;where(<span class="variable">$this</span>-&gt;_child,<span class="variable">$target</span>)-&gt;get(<span class="variable">$this</span>-&gt;table);
-            <span class="keyword">if</span>(<span class="variable">$query</span>-&gt;num_rows() &gt; <span class="number">0</span>)
-            {
-                <span class="variable">$row</span> = <span class="variable">$query</span>-&gt;row();
-                <span class="variable">$nodeTree</span>[] = <span class="variable">$target</span>;
-                <span class="variable">$this</span>-&gt;getParent(<span class="variable">$row</span>-&gt;{<span class="variable">$this</span>-&gt;_parent},&amp;<span class="variable">$nodeTree</span>);
-            }
-        }
-
-        <span class="keyword">return</span> <span class="variable">$nodeTree</span>;
-    }
-
-    <span class="keyword">public</span> <span class="function"><span class="keyword">function</span> <span class="title">getChild</span><span class="params">(<span class="variable">$target</span> = NULL, &amp;<span class="variable">$nodeTree</span> = array<span class="params">()</span>,&amp;<span class="variable">$j</span> = -<span class="number">1</span>)</span>
-    {</span>
-        <span class="variable">$target</span> = ! <span class="variable">$target</span>?<span class="variable">$this</span>-&gt;_root:<span class="variable">$target</span>;
-
-        <span class="variable">$this</span>-&gt;select(<span class="variable">$this</span>-&gt;table.<span class="string">'.'</span>.<span class="variable">$this</span>-&gt;_parent.<span class="string">','</span>.<span class="variable">$this</span>-&gt;table.<span class="string">'.'</span>.<span class="variable">$this</span>-&gt;_child);
-
-        <span class="variable">$query</span> = <span class="variable">$this</span>-&gt;db-&gt;where(<span class="variable">$this</span>-&gt;table.<span class="string">'.'</span>.<span class="variable">$this</span>-&gt;_parent,<span class="variable">$target</span>)-&gt;get(<span class="variable">$this</span>-&gt;table);
-
-        <span class="keyword">if</span>(<span class="variable">$query</span>-&gt;num_rows &gt; <span class="number">0</span>)
-        {
-            <span class="comment">//$i的作用仅仅在于为每一个child提供不同的parent键值</span>
-            <span class="variable">$i</span> = <span class="number">1</span>;
-            <span class="keyword">foreach</span>(<span class="variable">$query</span>-&gt;result() <span class="keyword">as</span> <span class="variable">$childSlibing</span>)
-            {
-                <span class="variable">$searchNode</span> = <span class="variable">$childSlibing</span>-&gt;{<span class="variable">$this</span>-&gt;_child};
-                <span class="variable">$j</span>++;
-
-                <span class="variable">$nodeTree</span>[<span class="variable">$target</span>.<span class="string">'-'</span>.<span class="variable">$j</span>.<span class="string">'-'</span>.<span class="variable">$i</span>] = <span class="variable">$searchNode</span>;
-
-                <span class="variable">$this</span>-&gt;getChild(<span class="variable">$has_maney</span>,<span class="variable">$searchNode</span>,&amp;<span class="variable">$nodeTree</span>,&amp;<span class="variable">$j</span>);
-
-                <span class="variable">$j</span>--;
-                <span class="variable">$i</span>++;
-            }
-        }
-
-        <span class="keyword">return</span> <span class="variable">$nodeTree</span>;
-    }
-
-    <span class="comment">/**
-     *
-     * 判断两者是否相互包涵，即规定改变
-     */</span>
-    <span class="keyword">protected</span> <span class="function"><span class="keyword">function</span> <span class="title">_notChildOf</span><span class="params">(<span class="variable">$field</span>)</span>
-    {</span>
-        <span class="keyword">if</span>(<span class="keyword">empty</span>(<span class="variable">$this</span>-&gt;{<span class="variable">$field</span>}))
-        {
-            <span class="keyword">return</span> <span class="keyword">FALSE</span>;
-        }
-        <span class="keyword">else</span>
-        {
-            <span class="variable">$parents</span> = <span class="variable">$this</span>-&gt;getParent(<span class="variable">$this</span>-&gt;{<span class="variable">$field</span>});
-            <span class="keyword">if</span>(in_array(<span class="variable">$this</span>-&gt;{<span class="variable">$this</span>-&gt;_child},<span class="variable">$parents</span>))
-            {
-                <span class="keyword">return</span> <span class="keyword">FALSE</span>;
-            }
-            <span class="keyword">else</span>
-            {
-                <span class="keyword">return</span> <span class="keyword">TRUE</span>;
-            }
-
-        }
-    }
-}
-</pre></figure>
-
-</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li></ul><a href="/2010/07/16/hierarchical-data-show-in-html/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2010-07-15T02:10:58.000Z" class="post__time">July 15, 2010</time><h1 class="post__title"><a href="/2010/07/15/test-of-array_key_exists-vs-isset/">isset和array_key_exists的比较测试</a></h1></header><div class="post__main"><p>经常使用isset和array_key_exists测试数组中的变量是否存在，然后忽然很想知道到底两者有什么区别，然后百度了一下，有说 array_key_exists<a href="www.laohucheng.com/post/122/">更快</a>的，也用说isset更快的，当然似乎更多人建议 isset。</p>
-<p>于是自己做了一个测试，比较一下两者的差异：注，本文最初发在<a href="http://codeigniter.org.cn/forums/thread-5991-1-1.html" target="_blank">ci论坛</a></p>
-<p>结果大致如下：</p>
-<p>当数组个数为10时，两者差异就体现出来了——isset速度要快近10倍，但不是很明显，而且对于变量是否存在，两者之间的差异没有太大，当变量存在时运行更快，但是这种趋势在是非常微弱的。使用 array_key_exists随着循环的次数增加，程序运行的时间增加量是成几何级数增加的，当一个数组元素个数超过 1000时运行速度就非常慢了。</p>
-<p>最后总结如下：</p>
-<p>1、isset和array_key_exists在对判断一个数组函数中某个元素是否存在，isset速度要更快，而且这 种速度差异是非常大的</p>
-<p>2、isset属于php中的语言结构，而后者是函数，所以前者更快，isset不可 以用于可变函数</p>
-<p>3、对于变量值的判断，当变量为NULL时，isset返回的结果是false，而后者只判断变量是否存在。所以如果判断一个数组中的某个 元素，并且判断其是否是否为真，应该用isset</p>
-<p>4、isset属于php特定语言结构，后者在其他语言中也存在，更具可读性</p>
-<p>具体测试过程，使用<a href="http://codeigniter.org.cn" target="_blank">ci</a>基准测试类测试</p>
-<figure class="highlight"><pre>    function issetVsArray()
-    {
-        <span class="variable">$loop</span> = <span class="number">10</span>;
-
-        <span class="variable">$test</span> = array();
-        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span> &<span class="keyword">lt</span>;= <span class="variable">$loop</span>; <span class="variable">$i</span>++)
-        {
-            <span class="variable">$test</span>[<span class="string">'test'</span>.<span class="variable">$i</span>] = <span class="variable">$i</span>;
-        }
-
-        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'issetAllFalse'</span>);
-
-        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
-        {
-            isset(<span class="variable">$test</span>[<span class="string">'t'</span>.<span class="variable">$i</span>]);
-        }
-        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'arraysAllFalse'</span>);
-        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
-        {
-            array_key_exists(<span class="string">'t'</span>.<span class="variable">$i</span>,<span class="variable">$test</span>);
-        }
-
-        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'issetAllTrue'</span>);
-        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
-        {
-            isset(<span class="variable">$test</span>[<span class="string">'test'</span>.<span class="variable">$i</span>]);
-        }
-        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'arraysAllTrue'</span>);
-        <span class="keyword">for</span>( <span class="variable">$i</span> = <span class="number">0</span>; <span class="variable">$i</span>&<span class="keyword">lt</span>;=<span class="variable">$loop</span>; <span class="variable">$i</span>++)
-        {
-            array_key_exists(<span class="string">'test'</span>.<span class="variable">$i</span>,<span class="variable">$test</span>);
-        }
-        <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;mark(<span class="string">'end'</span>);
-
-        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'issetAllFalse'</span>,<span class="string">'arraysAllFalse'</span>).<span class="string">'&lt;br /&gt;'</span>;
-        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'arraysAllFalse'</span>,<span class="string">'issetAllTrue'</span>).<span class="string">'&lt;br /&gt;'</span>;
-        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'issetAllTrue'</span>,<span class="string">'arraysAllTrue'</span>).<span class="string">'&lt;br /&gt;'</span>;
-        echo <span class="variable">$this</span>-&<span class="keyword">gt</span>;benchmark-&<span class="keyword">gt</span>;elapsed_time(<span class="string">'arraysAllTrue'</span>,<span class="string">'end'</span>).<span class="string">'&lt;br /&gt;'</span>;
-    }
-</pre></figure>
-
-<p>几次测试结果：</p>
-<figure class="highlight"><pre>循环<span class="number">10</span>次，<span class="variable">$loop</span>=<span class="number">10</span>
-<span class="number">0.0001</span>
-<span class="number">0.0009</span>
-<span class="number">0.0001</span>
-<span class="number">0.0007</span>
-
-循环<span class="number">100</span>次，<span class="variable">$loop</span>=<span class="number">100</span>
-<span class="number">0.0003</span>
-<span class="number">0.0185</span>
-<span class="number">0.0003</span>
-<span class="number">0.0189</span>
-
-循环<span class="number">1000</span>次，<span class="variable">$loop</span>=<span class="number">1000</span>
-<span class="number">0.0015</span>
-<span class="number">0.2831</span>
-<span class="number">0.0020</span>
-<span class="number">0.2839</span>
-
-循环<span class="number">10000</span>次，<span class="variable">$loop</span>=<span class="number">10000</span>
-<span class="number">0.0157</span>
-<span class="number">8.4764</span>
-<span class="number">0.0164</span>
-<span class="number">8.4101</span>
-</pre></figure>
-
-</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li></ul><a href="/2010/07/15/test-of-array_key_exists-vs-isset/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><span title="Previous" class="page-menu__link icon-arrow-left page-menu__link--disabled"></span></li><li class="page-menu__item"><a title="Next" href="/page/2/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/spss/" class="post__tag__link">spss</a></li></ul><a href="/2010/09/24/spss-install/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><span title="Previous" class="page-menu__link icon-arrow-left page-menu__link--disabled"></span></li><li class="page-menu__item"><a title="Next" href="/page/2/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
 j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
 (document,"script","shepherdwind","count");
 </script>

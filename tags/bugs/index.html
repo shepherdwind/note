@@ -4,7 +4,7 @@
 <h3 id="-">问题描述</h3>
 <p>上周五，开发说，线上有很多IE8用户数据没有通过前端校验，直接提交到后端，导致很多报错。我研究了很久，最后，发现问题是，校验失效了。</p>
 <h3 id="-">分析</h3>
-<p>直接原因是，整个校验还是有，但是校验失败的情况下，表单还是提交了。在chrome，因为剑平的Auth是基于html5校验的，所以，表单提交动作被拦截了。造成似乎只有IE8有这个问题的假象，从这点看，这次的问题因为剑平Auth选择使用html5标准，从而问题较少了不少。</p>
+<p>直接原因是，整个校验还是有，但是校验失败的情况下，表单还是提交了。在chrome，因为剑平的Auth是基于html5校验的，所以，表单提交动作被拦截了。造成似乎只有IE8有这个问题的假象，从这点看，这次的问题因为剑平Auth选择使用html5标准，从而问题较少了不少。</p>
 <p>继续分析源码，发现问题是以前整个表单的提交动作是由js来完成的，通过submit()函数提交。当Auth的校验通过之后，会提交表单。而现在这个页面的点击按钮由原来的div，变成了button，在一个表单中，button默认是submit类型的。</p>
 <h3 id="-">结论</h3>
 <p>提交按钮由div变成button了，导致页面直接被提交了。我离开把这个button改成div，让开发马上发模板。后来听说，这个改动是玉门改的，当时有个日常需求需要的。不过想想，div作为提交的按钮，确实容易引起误解，改成button，也蛮正常的，只是，这个页面的提交逻辑封装在一个gallery组件里。新接手的时候，难免不清楚这样的逻辑。</p>
@@ -23,18 +23,18 @@
 <p>Bidi的调试，一直是个非常头痛的问题，上次玉门发现一个bug，找我看了好久，我最后凭感觉找到一个隐藏的bug。这里涉及到Bidi里面的model和view(dom)，另外还有剑平的模拟选择框，三个对象都可以能有问题。select的改变犹如一个黑盒，时间绑定一方面完全解绑了发布事件者和事件订阅之间的联系，同时这种解耦导致调试非常麻烦，你完全不知道是在什么情况下处罚了某一事件。</p>
 <p>这时候，我想到了bidi曾经遇到一个问题，Firefox的Object下有一个方法watch，这个watch是火狐独有的方法，基本没什么用。不过能够监控变量被修改，这个可以之间从前面的黑盒中找到问题发生的现场。</p>
 <p>有了这个思路，就好办了。首先，点击修改后“退款原因”被修改了，那么一定会映射到对应的js变量<code>reasons.defaultValue</code>上，只需要监控谁在修改了<code>reasons.defaultValue</code>。然后，写下watch函数的是实现：</p>
-<figure class="highlight"><pre>  <span class="function"><span class="keyword">function</span> <span class="title">watch</span><span class="params">(obj, property)</span>{</span>
+<figure class="highlight js"><pre>  <span class="function"><span class="keyword">function</span> <span class="title">watch</span><span class="params">(obj, property)</span>{</span>
 
     <span class="comment">// 通过闭包，存贮value</span>
     <span class="keyword">var</span> nowVal = obj[property];
 
     <span class="keyword">return</span> <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
 
-      Object.defineProperty(obj, property, {
-        <span class="keyword">get</span>: <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
+      <span class="built_in">Object</span>.defineProperty(obj, property, {
+        get: <span class="function"><span class="keyword">function</span><span class="params">()</span>{</span>
           <span class="keyword">return</span> nowVal;
         },
-        <span class="keyword">set</span>: <span class="function"><span class="keyword">function</span><span class="params">(v)</span>{</span>
+        set: <span class="function"><span class="keyword">function</span><span class="params">(v)</span>{</span>
           <span class="comment">// 设置一个断点，查看变量被修改的场景</span>
           debugger
           nowVal = v;
