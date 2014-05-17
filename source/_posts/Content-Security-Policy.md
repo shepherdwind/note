@@ -12,12 +12,14 @@ tags: [安全, CSP, 翻译]
 
 另外，框架开发者也应该考虑CSP兼容的问题了，测试过程很简单
 
-```
+```php
 <?php
 //header('Content-Security-Policy: default-src *; report-uri /csp/recode.php');
 header("X-Frame-Options: SAMEORIGIN");
 header("Content-Security-Policy: default-src *; script-src 'self' g.tbcdn.cn");
+?>
 ```
+
 --------------------------------------
 
 全文翻译如下：
@@ -32,7 +34,7 @@ header("Content-Security-Policy: default-src *; script-src 'self' g.tbcdn.cn");
 
 在Rails应用激活CSP是轻松的，它只是一句简单的头信息。你不需要引入任何其他库；设置一个before filter就够了(译注：before filter应该是请求处理前置的hook)。
 
-```
+```ruby
 before_filter :set_csp
 
 def set_csp
@@ -54,7 +56,7 @@ end
 
 大部分内嵌的脚本都是用来配置页面属性的。
 
-```
+```html
 <script type="text/javascript">
 GitHub.user = 'josh'
 GitHub.repo = 'rails'
@@ -64,7 +66,7 @@ GitHub.branch = 'master'
 
 更好地方式是以下代码展示的，把配置信息放在`data-*`的属性中。
 
-```
+```html
 <div data-user="josh" data-repo="rails" data-branch="master">
 </div>
 ```
@@ -75,7 +77,7 @@ GitHub.branch = 'master'
 
 如果你在2008年之后写过JS，你大概会使用一种不那么直接的方式绑定事件。但是在你的代码库里面，可能还隐藏着一些内联的事件绑定。
 
-```
+```html
 <a href="" onclick="handleClick();"></a>
 <a href="javascript:handleClick();"></a>
 ```
@@ -89,7 +91,7 @@ GitHub.branch = 'master'
 
 将会输出
 
-```
+```html
 <a href="/" data-confirm="Are you sure?">Delete</a>
 ```
 
@@ -109,7 +111,7 @@ GitHub.branch = 'master'
 
 最常用于控制元素加载时隐藏的方式如下
 
-```
+```html
 <div class="tab"></div>
 <div class="tab" style="display:none"></div>
 <div class="tab" style="display:none"></div>
@@ -117,14 +119,14 @@ GitHub.branch = 'master'
 
 更好的方式是使用CSS状态的class
 
-```
+```html
 <div class="tab selected"></div>
 <div class="tab"></div>
 <div class="tab"></div>
 ```
 
 
-```
+```css
 .tab { display: none }
 .tab.selected { display: block }
 ```
@@ -170,7 +172,7 @@ Chrome插件[LastPass](https://lastpass.com/)就有CSP兼容问题，因为它�
 
 一个bug具体的例子是克隆一个有CSS属性元素(译注：这个bug已经修复了).
 
-```
+```js
 var el = document.createElement('div');
 el.style.display = 'none'
 el.cloneNode(true);

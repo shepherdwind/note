@@ -6,8 +6,6 @@ var file = './tools/PSTools/PsExec.exe';
 var steam = fs.createReadStream(file);
 var writefile = fs.createWriteStream(file.replace(/\.exe$/, '.hex'));
 
-writefile.write('0x');
-
 function writeTofile(write, buf){
   var code = buf[0];
   var i = 0;

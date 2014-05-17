@@ -4,5 +4,8 @@
   "private": true,
   "dependencies": {
     "hexo-renderer-jade": "0.0.2"
+  },
+  "devDependencies": {
+    "hexo-generator-sitemap": "~0.1.1"
   }
 }

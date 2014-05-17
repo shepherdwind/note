@@ -14,7 +14,6 @@ function shellini(){
 	<body>
 <?php
 
-
 if(!empty($_GET['action']) && $_GET['action']=='help')
 	mysql_help();
 

@@ -5,10 +5,11 @@
 <p><strong> 说明 </strong>：本文是Github全站部署CSP策略过程总结的经验。总体上，CSP安全策略很大程度上解决了JS非同源策略引起的问题，通过JS加载源白名单机制，能够很好的保护用户。</p>
 <p>作为前端，CSP策略所提倡的方案，都是JS和CSS规范的方案，CSP所做的是完全抛弃不规范内联JS写法，只要我们稍微注意就能够做到了，而且这也是一个专业的前端应该做到的。</p>
 <p>另外，框架开发者也应该考虑CSP兼容的问题了，测试过程很简单</p>
-<figure class="highlight"><pre>&lt;?php
-//header(<span class="attribute">'Content</span>-Security-Policy: <span class="keyword">default</span>-src *; <span class="keyword">report</span>-uri /csp/recode.php');
+<figure class="highlight php"><pre><span class="preprocessor">&lt;?php</span>
+<span class="comment">//header('Content-Security-Policy: default-src *; report-uri /csp/recode.php');</span>
 header(<span class="string">"X-Frame-Options: SAMEORIGIN"</span>);
 header(<span class="string">"Content-Security-Policy: default-src *; script-src 'self' g.tbcdn.cn"</span>);
+<span class="preprocessor">?&gt;</span>
 </pre></figure>
 
 <hr>
@@ -18,7 +19,7 @@ header(<span class="string">"Content-Security-Policy: default-src *; script-src 
 <h2 id="-">准备好你的应用服务器</h2>
 <h3 id="csp-header">CSP header</h3>
 <p>在Rails应用激活CSP是轻松的，它只是一句简单的头信息。你不需要引入任何其他库；设置一个before filter就够了(译注：before filter应该是请求处理前置的hook)。</p>
-<figure class="highlight"><pre>before_filter <span class="symbol">:set_csp</span>
+<figure class="highlight ruby"><pre>before_filter <span class="symbol">:set_csp</span>
 
 <span class="function"><span class="keyword">def</span> </span>set_csp
   response.headers[<span class="string">'Content-Security-Policy'</span>] = <span class="string">"default-src *; script-src https://assets.example.com; style-src https://assets.example.com"</span>
@@ -32,7 +33,7 @@ header(<span class="string">"Content-Security-Policy: default-src *; script-src 
 <h3 id="-">内联脚本</h3>
 <p>除非设置了<code>unsafe-inline</code>，所有的内联脚本标签都会被拦截。这是实现你想要的XSS防御的主要手段。</p>
 <p>大部分内嵌的脚本都是用来配置页面属性的。</p>
-<figure class="highlight"><pre><span class="tag">&lt;<span class="title">script</span> <span class="attribute">type</span>=<span class="value">"text/javascript"</span>&gt;</span><span class="javascript">
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">script</span> <span class="attribute">type</span>=<span class="value">"text/javascript"</span>&gt;</span><span class="javascript">
 GitHub.user = <span class="string">'josh'</span>
 GitHub.repo = <span class="string">'rails'</span>
 GitHub.branch = <span class="string">'master'</span>
@@ -40,15 +41,15 @@ GitHub.branch = <span class="string">'master'</span>
 </pre></figure>
 
 <p>更好地方式是以下代码展示的，把配置信息放在<code>data-*</code>的属性中。</p>
-<figure class="highlight"><pre><span class="subst">&lt;</span>div <span class="built_in">data</span><span class="attribute">-user</span><span class="subst">=</span><span class="string">"josh"</span> <span class="built_in">data</span><span class="attribute">-repo</span><span class="subst">=</span><span class="string">"rails"</span> <span class="built_in">data</span><span class="attribute">-branch</span><span class="subst">=</span><span class="string">"master"</span><span class="subst">&gt;</span>
-<span class="subst">&lt;</span>/div<span class="subst">&gt;</span>
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">div</span> <span class="attribute">data-user</span>=<span class="value">"josh"</span> <span class="attribute">data-repo</span>=<span class="value">"rails"</span> <span class="attribute">data-branch</span>=<span class="value">"master"</span>&gt;</span>
+<span class="tag">&lt;/<span class="title">div</span>&gt;</span>
 </pre></figure>
 
 
 <h3 id="-">内联事件绑定</h3>
 <p>和内联脚本标签一样，内联的事件绑定也过时了。</p>
 <p>如果你在2008年之后写过JS，你大概会使用一种不那么直接的方式绑定事件。但是在你的代码库里面，可能还隐藏着一些内联的事件绑定。</p>
-<figure class="highlight"><pre><span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">""</span> <span class="attribute">onclick</span>=<span class="value">"handleClick();"</span>&gt;</span><span class="tag">&lt;/<span class="title">a</span>&gt;</span>
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">""</span> <span class="attribute">onclick</span>=<span class="value">"handleClick();"</span>&gt;</span><span class="tag">&lt;/<span class="title">a</span>&gt;</span>
 <span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">"javascript:handleClick();"</span>&gt;</span><span class="tag">&lt;/<span class="title">a</span>&gt;</span>
 </pre></figure>
 
@@ -57,7 +58,7 @@ GitHub.branch = <span class="string">'master'</span>
 </pre></figure>
 
 <p>将会输出</p>
-<figure class="highlight"><pre><span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">"/"</span> <span class="attribute">data-confirm</span>=<span class="value">"Are you sure?"</span>&gt;</span>Delete<span class="tag">&lt;/<span class="title">a</span>&gt;</span>
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">a</span> <span class="attribute">href</span>=<span class="value">"/"</span> <span class="attribute">data-confirm</span>=<span class="value">"Are you sure?"</span>&gt;</span>Delete<span class="tag">&lt;/<span class="title">a</span>&gt;</span>
 </pre></figure>
 
 <p>你需要使用UJS引擎，比如<a href="https://github.com/rails/jquery-ujs" target="_blank">jquery-ujs</a>或者<a href="https://github.com/josh/rails-behaviors" target="_blank">rails-behaviors</a>，通过配置data属性来实所有的效果。</p>
@@ -68,18 +69,18 @@ GitHub.branch = <span class="string">'master'</span>
 <h3 id="-css">行内CSS</h3>
 <p>除非<code>style-src</code>定义了<code>unsafe-inline</code>，否则所有的html中style属性都是无效的。</p>
 <p>最常用于控制元素加载时隐藏的方式如下</p>
-<figure class="highlight"><pre>&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
-&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span> style=<span class="string">"display:none"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
-&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span> style=<span class="string">"display:none"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
+<span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab"</span> <span class="attribute">style</span>=<span class="value">"display:none"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
+<span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab"</span> <span class="attribute">style</span>=<span class="value">"display:none"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
 </pre></figure>
 
 <p>更好的方式是使用CSS状态的class</p>
-<figure class="highlight"><pre>&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab selected"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
-&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
-&lt;<span class="keyword">div</span> <span class="type">class</span>=<span class="string">"tab"</span>&gt;&lt;/<span class="keyword">div</span>&gt;
+<figure class="highlight html"><pre><span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab selected"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
+<span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
+<span class="tag">&lt;<span class="title">div</span> <span class="attribute">class</span>=<span class="value">"tab"</span>&gt;</span><span class="tag">&lt;/<span class="title">div</span>&gt;</span>
 </pre></figure>
 
-<figure class="highlight"><pre><span class="class">.tab</span> <span class="rules">{ <span class="rule"><span class="attribute">display</span>:<span class="value"> none </span></span></span>}
+<figure class="highlight css"><pre><span class="class">.tab</span> <span class="rules">{ <span class="rule"><span class="attribute">display</span>:<span class="value"> none </span></span></span>}
 <span class="class">.tab</span><span class="class">.selected</span> <span class="rules">{ <span class="rule"><span class="attribute">display</span>:<span class="value"> block </span></span></span>}
 </pre></figure>
 
@@ -110,10 +111,10 @@ GitHub.branch = <span class="string">'master'</span>
 <p>这是非常必要的，比如你希望在你的网站上实现一个需要动态绝对定位的自定义提示条效果(译注：提示条需要改变left和top值)。</p>
 <p>对于行内CSS序列化实现还是有一些bug(译注：CSS规则序列化的结果输出为<a href="http://dev.w3.org/csswg/cssom/#dom-cssrule-csstext" target="_blank">cssText</a>，序列化过程指cssText转换为CSSOM的解析过程).</p>
 <p>一个bug具体的例子是克隆一个有CSS属性元素(译注：这个bug已经修复了).</p>
-<figure class="highlight"><pre><span class="built_in">var</span> el <span class="subst">=</span> document<span class="built_in">.</span>createElement(<span class="string">'div'</span>);
-el<span class="built_in">.</span>style<span class="built_in">.</span>display <span class="subst">=</span> <span class="string">'none'</span>
-el<span class="built_in">.</span>cloneNode(<span class="literal">true</span>);
-<span class="subst">&gt;</span> Refused <span class="keyword">to</span> apply <span class="keyword">inline</span> style because it violates the following Content Security Policy directive: <span class="string">"style-src http://localhost"</span><span class="built_in">.</span>
+<figure class="highlight js"><pre><span class="keyword">var</span> el = document.createElement(<span class="string">'div'</span>);
+el.style.display = <span class="string">'none'</span>
+el.cloneNode(<span class="literal">true</span>);
+&gt; Refused to apply inline style because it violates the following Content Security Policy directive: <span class="string">"style-src http://localhost"</span>.
 </pre></figure>
 
 <p>同时，正如前面提到过得，像jQuery和Modernizr这种类库执行一些浏览器特性侦探的时候，在页面注入一些自定义的样式用于测试，可能会引起异常。但愿这些问题能够被这些组件自己去解决。</p>
@@ -124,7 +125,7 @@ el<span class="built_in">.</span>cloneNode(<span class="literal">true</span>);
 <p>尽管有一些问题，我们还是选择部署CSP策略。希望最新的<a href="http://www.w3.org/TR/CSP11/" target="_blank">CSP 1.1 draft</a>提案能够解决一些问题。</p>
 <p>最后，特别感谢来自谷歌的<a href="https://github.com/mikewest" target="_blank">mikewest</a>给与我们的帮助。</p>
 </div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/安全/" class="post__tag__link">安全</a></li><li class="post__tag__item"><a href="/tags/CSP/" class="post__tag__link">CSP</a></li><li class="post__tag__item"><a href="/tags/翻译/" class="post__tag__link">翻译</a></li></ul><a href="/2014/03/13/Content-Security-Policy/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><div class="comments"><div id="disqus_thread"><noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
-</noscript></div></div></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><a title="Previous" href="/2014/03/19/find-the-bugs/" class="page-menu__link icon-arrow-left"></a></li><li class="page-menu__item"><a title="Next" href="/2012/11/29/how-to-realize-a-compiler/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+</noscript></div></div></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><a title="Previous" href="/2014/03/19/find-some-bugs/" class="page-menu__link icon-arrow-left"></a></li><li class="page-menu__item"><a title="Next" href="/2012/11/29/how-to-realize-a-compiler/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
 j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
 (document,"script","shepherdwind","embed");
 </script>
