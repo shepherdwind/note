@@ -1,5 +1,5 @@
 <pkav>
-	<rect width="400" height="300" xscale="0.5" yscale="0.5" rotate="90">
+	<rect width="400" height="300" xscale="0.5" yscale="0.5" rotate="180">
 		<successMsg>你真厉害！！</successMsg>
 	</rect>
 </pkav>
