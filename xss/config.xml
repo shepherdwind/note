@@ -1,5 +1,5 @@
 <pkav>
 	<rect width="200" height="300" xscale="-1" yscale="-1" rotate="180">
-    <successMsg><img src="" onerror="alert(1)"></successMsg>
+		<successMsg>hello world</successMsg>
 	</rect>
 </pkav>
