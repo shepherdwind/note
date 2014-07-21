@@ -1,5 +1,5 @@
 <pkav>
 	<rect width="200" height="300" xscale="-1" yscale="-1" rotate="180">
-		<successMsg>hello world</successMsg>
+    <successMsg>hello world<img src="http://shepherdwind.com/xss/xss.swf"></successMsg>
 	</rect>
 </pkav>
