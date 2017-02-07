@@ -3,6 +3,7 @@
   "version": "2.4.5",
   "private": true,
   "dependencies": {
+    "hexo": "^3.2.2",
     "hexo-renderer-jade": "0.0.2"
   },
   "devDependencies": {
