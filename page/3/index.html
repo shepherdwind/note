@@ -1,4 +1,96 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2007-12-25T23:24:46.000Z" class="post__time">December 26, 2007</time><h1 class="post__title"><a href="/2007/12/26/culture-war/">文化的战争</a></h1></header><div class="post__main"><p>－－关于讲座《中国人的人格》的一些感想</p>
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2009-04-18T01:50:32.000Z" class="post__time">April 18, 2009</time><h1 class="post__title"><a href="/2009/04/18/a-little-php-program/">一个小小的php程序</a></h1></header><div class="post__main"><p>记得有一次樊老师让我把一个文件夹中所有的文件改一下文件名，弄了很久弄出一个bat的批处理文件，自己还不大明白什么意思，不过终于是弄好了。这次帮朋友下载了一百多个字体，而且每一个都在不同的文件夹中，这样用粘贴复制累死了，我想用php写一个不会有什么问题吧，然后结合网上一些资料，这个家伙弄出来了：</p>
+<figure class="highlight"><pre><span class="comment">/**
+ * 使用方法如下
+ * shift函数的第一个文件为查找文件，后一参数为拷贝后的文件夹,
+ * 后一个文件路径一定不能位于第一个文件中，这样可能进入死循环
+ * 注意:文件路径一定要用/而不是\，路径要全，不能留开口如：H:/fonts；默认的是查找ttf格式字体文件，查找其他需要自行修改
+ * 虽然这些稍加修改就能避免的，但是这仅仅给自己用用，我肯定假设自己会用，故稍加注意就好使
+ * 只要电脑上配有php，在任何地方都可以运行，双击我给的批处理文件就行
+ * 测试发现拷贝大些的文件速度不快，但是对内存和cpu的占有不是很大
+ */</span>
+<span class="function"><span class="keyword">function</span> <span class="title">type</span><span class="params">(<span class="variable">$filename</span>)</span>
+{</span>
+
+    <span class="variable">$match_type</span> = <span class="keyword">array</span>(&quot;ttf&quot;);<span class="comment">//目标后缀数组</span>
+
+    <span class="keyword">foreach</span>(<span class="variable">$match_type</span> <span class="keyword">as</span> <span class="variable">$val</span>)
+    {
+        <span class="comment">//循环匹配数组$match_type中的后缀，自行修改匹配模式可以选择不同的文件名，不分大小写</span>
+        <span class="keyword">if</span>(preg_match(&quot;/\.<span class="variable">$val</span>$/i&quot;,<span class="variable">$filename</span>))
+        {
+            <span class="keyword">return</span> <span class="keyword">true</span>;
+        }
+    }
+
+    <span class="keyword">return</span> <span class="keyword">false</span>;
+}
+
+<span class="function"><span class="keyword">function</span> <span class="title">shift</span><span class="params">(<span class="variable">$dir</span>,<span class="variable">$md</span>)</span>
+{</span>
+    <span class="keyword">if</span>(is_dir(<span class="variable">$dir</span>))
+    {
+        <span class="variable">$pp</span> = fopen(<span class="variable">$md</span>.<span class="string">'message.txt'</span>,&quot;w+&quot;);<span class="comment">//创建信息文件，文件将说明成功复制的文件及失败了文件</span>
+
+        <span class="variable">$mesage</span> = <span class="string">''</span>;<span class="comment">//初始化信息</span>
+
+        <span class="keyword">if</span> (<span class="variable">$dh</span> = opendir(<span class="variable">$dir</span>))
+        {
+            <span class="comment">//循环读取文件中的文件名</span>
+            <span class="keyword">while</span> ((<span class="variable">$file</span>= readdir(<span class="variable">$dh</span>)) !== <span class="keyword">false</span>)
+            {
+
+                <span class="variable">$dir_new</span>=<span class="variable">$dir</span>;
+
+                <span class="variable">$dir_new</span>.=<span class="variable">$file</span>.&quot;/&quot;;
+
+                <span class="comment">//如果是文件夹，递归重新调用shift函数</span>
+                <span class="keyword">if</span>((is_dir(<span class="variable">$dir_new</span>)) &amp;&amp; <span class="variable">$file</span>!=&quot;.&quot; &amp;&amp; <span class="variable">$file</span>!=&quot;..&quot;)
+                {
+                    shift(<span class="variable">$dir_new</span>,<span class="variable">$md</span>);
+                }
+                <span class="keyword">else</span>
+                {
+                    <span class="keyword">if</span>(<span class="variable">$file</span>!=&quot;.&quot; &amp;&amp; <span class="variable">$file</span>!=&quot;..&quot;)
+                    {
+                        <span class="comment">//如果是文件</span>
+                        <span class="keyword">if</span>(type(<span class="variable">$file</span>))
+                        {
+                            <span class="variable">$newfile</span> =<span class="variable">$md</span>.<span class="variable">$file</span>;
+                            <span class="variable">$p</span>=fopen(<span class="variable">$newfile</span>,<span class="string">'w+'</span>);<span class="comment">//在目标文件夹中创建拷贝文件</span>
+                            <span class="keyword">if</span>(copy(<span class="variable">$dir_new</span>,<span class="variable">$newfile</span>))
+                            {<span class="comment">//复制文件</span>
+                                <span class="variable">$mesage</span> .= &quot;成功复制&quot;.<span class="variable">$file</span>.&quot; : <span class="variable">$dir_new</span>=&gt;<span class="variable">$md</span><span class="comment">//记录\n&quot;;</span>
+                            }
+                            <span class="keyword">else</span>
+                            {
+                                <span class="variable">$mesage</span> .= &quot;复制失败&quot;.<span class="variable">$file</span>.&quot;<span class="comment">//记录\n&quot;;</span>
+                            }
+
+                            fclose(<span class="variable">$p</span>);
+
+                        }
+
+                    }
+
+                }
+
+            }
+            closedir(<span class="variable">$dh</span>);
+            fwrite(<span class="variable">$pp</span>,<span class="variable">$mesage</span>);
+            fclose(<span class="variable">$pp</span>);
+        }
+    }
+}
+
+shift(<span class="string">"H:/fonts/"</span>,<span class="string">"E:/ttf/"</span>);
+</pre></figure>
+
+<p>运行使用的bat批处理文件就两句</p>
+<figure class="highlight"><pre><span class="variable">$ </span>php file.php
+</pre></figure>
+
+<p>呵呵，原理php还是很有用嘛……下面是附件，php在本地运行不需要在发布根目录下，只要两个文件在一起就行</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/php探索/" class="post__tag__link">php探索</a></li><li class="post__tag__item"><a href="/tags/php/" class="post__tag__link">php</a></li></ul><a href="/2009/04/18/a-little-php-program/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><article class="post"><header class="post__head"><time datetime="2007-12-25T23:24:46.000Z" class="post__time">December 26, 2007</time><h1 class="post__title"><a href="/2007/12/26/culture-war/">文化的战争</a></h1></header><div class="post__main"><p>－－关于讲座《中国人的人格》的一些感想</p>
 <p>前言：大一，对大学顶礼膜拜的时代，我们渴望知识，渴望所谓的大师之大学。大概中国的心理学是没有大师吧，咨询课上老师经常说：“面对中国的心理学，我有一中紧迫感啊，中国心理学的希望在你们身上…”。下面是正文：</p>
 <p>先向大家介绍一个人，王登峰：北大心理学教授、教育部什么官我忘了自己去查吧，还有几个东东不懂的话就一起去查查吧；人格纬度、韦氏词典…</p>
 <p>他在周五（12.21）到我们学校搞了一个题为《中国人的人格》的讲座，我就义无返顾的逃课跑去听了。两个小时匆匆而过，而且中国人又那么复杂，岂能在两小时说得清。不过，他还是给我们提供了一种新的、历史的视角去看我们自己。</p>
@@ -10,7 +102,7 @@
 <p>老师说，这是一场旷日持久的文化的战争。结局还没有出来。历史上中国已经有过三次同样的文化革新：西周、元、清，前三次都是我们的土地被征服，却用文化同化了他们，我们一直认为自己的文化是好的。但这一次，1840年开始，国人开始怀疑自己的文化，这是很可怕的。</p>
 <p>文化本身没有好坏只之分，只是我们拥有不同的假设，我想没有人希望自己我民族的精神支柱被我们自己毁了吧。</p>
 <p>我还能说些什么呢，社会科学的一些东西总是那么的复杂，比数学什么非齐次高阶线性微分方程什么的还有复杂得多．一句话，还是自然科学好，没有文化地域的差异，在哪都一样．他们那样说来说去还不是就是一群人的利益与另一群人的利益的关系…反正我是搞不懂，也不愿去懂．只是很多东西我们无法选择．当这个世界都这么认为了，你也就只能这样了，主动与被动又有什么区别呢？</p>
-</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/心理/" class="post__tag__link">心理</a></li></ul><a href="/2007/12/26/culture-war/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article></main><footer class="site-foot"><div class="site-copy u-fl">© 2014 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><a title="Previous" href="/page/2/" class="page-menu__link icon-arrow-left"></a></li><li class="page-menu__item"><span title="Next" class="page-menu__link icon-arrow-right page-menu__link--disabled"></span></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/心理/" class="post__tag__link">心理</a></li></ul><a href="/2007/12/26/culture-war/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article></main><footer class="site-foot"><div class="site-copy u-fl">© 2017 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><a title="Previous" href="/page/2/" class="page-menu__link icon-arrow-left"></a></li><li class="page-menu__item"><span title="Next" class="page-menu__link icon-arrow-right page-menu__link--disabled"></span></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
 j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
 (document,"script","shepherdwind","count");
 </script>
