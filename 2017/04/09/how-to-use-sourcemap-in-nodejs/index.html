@@ -1,0 +1,74 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="alternative" href="/atom.xml" title="shepherdwind" type="application/atom+xml"><link rel="icon" href="/favicon.png"><title>Node.js 中 sourcemap 使用问题总结 - shepherdwind</title><link rel="stylesheet" href="/css/main.css" type="text/css"><!--[if lt IE 9]><script>(function(a,b){a="abbr article aside audio bdi canvas data datalist details dialog figcaption figure footer header hgroup main mark meter nav output progress section summary template time video".split(" ");for(b=a.length-1;b>=0;b--)document.createElement(a[b])})()</script><![endif]--></head></html><body><header class="site-head"><h1 class="site-title u-fl"><a href="/">shepherdwind</a></h1><nav class="site-nav u-fr"><ul class="site-nav__list"><li class="site-nav__item"><a href="/" class="site-nav__link">Home</a></li><li class="site-nav__item"><a href="/archives" class="site-nav__link">Archives</a></li></ul></nav></header></body><main class="site-main"><article class="post"><header class="post__head"><time datetime="2017-04-09T13:44:54.000Z" class="post__time">April 9, 2017</time><h1 class="post__title"><a href="/2017/04/09/how-to-use-sourcemap-in-nodejs/">Node.js 中 sourcemap 使用问题总结</a></h1></header><div class="post__main"><h2 id="-">起源</h2>
+<p>Node 应用功能越来越复杂，很多业务都开始尝试使用 TypeScript 来开发。现在前端写的 JS 大部分是经过编译过程的，浏览器中通过 sourcemap 的使用，可以很好的解决源码和编译运行时代码差异的问题。</p>
+<p>那么，在 Node 服务器环境应该如何使用 sourcemap 呢？最近在重新搭建一个完全基于 ts 的 Node.js 应用，所有的相关流程看起来都挺美好的，唯一的缺陷是报错信息错误信息指向的是 js 文件。我觉得应该探索下如何让 Node 支持 sourcemap 。</p>
+<h2 id="-">原理</h2>
+<p>对于 Node 而言，服务器 sourcemap 最大的价值在于错误信息有正确的错误堆栈，所以只要我们能够实现自定义错误堆栈信息就可以了。</p>
+<p>恰好 v8 引擎有提供一个私有的 (<a href="https://github.com/v8/v8/wiki/Stack-Trace-API" target="_blank">Stack-Trace-API</a>)， 这个提供了让开发者自定义错误 stack 信息的能力。具体来说，开发者可以实现 <code>Error</code> 对象的 <code>prepareStackTrace</code> 方法，如果 <code>Error</code> 对象上定义了这个方法，那么每次错误信息都会经过 <code>Error.prepareStackTrace</code> 处理后返回。</p>
+<p><code>Error.prepareStackTrace</code> 方法可以拿到两个参数，错误基本信息和结构化错误堆栈，第二个参数是一个数组，通过这个数组可以拿到错误文件以及位置信息。最后基于这些信息重新返回一个字符串，这样就可以覆盖 Error 对象的 stack 属性了。</p>
+<p>基本代码结构如下：</p>
+<figure class="highlight js"><pre><span class="function"><span class="keyword">function</span> <span class="title">prepareStackTrace</span><span class="params">(error, stack)</span> {</span>
+  <span class="keyword">return</span> error + stack.map(<span class="function"><span class="keyword">function</span><span class="params">(frame)</span> {</span>
+    <span class="keyword">return</span> <span class="string">'\n    at '</span> + wrapCallSite(frame);;
+  }).join(<span class="string">''</span>);
+}
+<span class="built_in">Error</span>.prepareStackTrace = prepareStackTrace;
+</pre></figure>
+
+<p>在 <code>wrapCallSite</code> 方法里面可以通过分析源码，找到 sourceMap 然后返回正确的位置信息。</p>
+<p>原理很简单，已经有一个 npm 包 <a href="https://github.com/evanw/node-source-map-support" target="_blank">source-map-support</a> 封装好了相关功能。</p>
+<p>这看起来已经很完美了。sourcemap 读取只在出现错误的时候才执行，所以<strong>这个功能不会有性能问题，在生成环境也可以开启</strong>。</p>
+<h2 id="-">问题</h2>
+<p>Stack Trace API 看起来很美好，但现实场景总是更加复杂。我在引入 <a href="https://github.com/evanw/node-source-map-support" target="_blank">source-map-support</a> 后，运行起来没什么问题，但在跑测试用例的时候，错误堆栈的位置信息完全不对。</p>
+<p>这个问题排查了很久，最终定位到在 <code>wrapCallSite</code> 方法中拿到的 frame 对象返回的行号就是错误的，而这个获取行号的方法是 native code ，这个几乎没法调试了。我想，难道是 Node 的问题？要调试到 Node 源码么？</p>
+<p>折腾了很久没有什么效果，就在我打算放弃的时候，我换了一个假设，会不会是某个包依赖影响的？然后我尝试依次删除跑用例时 require 的包，终于发现是因为 <a href="https://eggjs.org/zh-cn/core/unittest.html#测试运行工具" target="_blank">egg-bin</a> 默认引入的 <code>power-assert</code> 导致的。</p>
+<p>问题定位到后，解决就容易了。但解决这个问题得先讲讲 power-assert 是如何实现的。</p>
+<h3 id="power-assert-sourcemap">power-assert 与 sourceMap</h3>
+<p>power-assert 作为一个断言库，最大的特色在于错误信息的报告是非常友好的，一张图可以很清晰看到区别</p>
+<p><img src="https://cloud.githubusercontent.com/assets/227713/20919940/19e83de8-bbd9-11e6-8951-bf4a332f9b5a.png" alt="img"></p>
+<p>实现这样炫酷的报告是需要做一些特殊的处理，把测试用例的代码进行一次转换，举个例子</p>
+<figure class="highlight js"><pre>it(<span class="string">'foo'</span>, <span class="function"><span class="keyword">function</span> <span class="title">foo</span><span class="params">()</span> {</span>
+  <span class="keyword">var</span> a = <span class="string">'foo'</span>;
+  <span class="keyword">var</span> b = <span class="string">'b'</span>;
+  assert(a === b);
+});
+</pre></figure>
+
+<p>经过 <a href="https://github.com/power-assert-js/espower-source" target="_blank">espower-source</a> 处理后，变成了这样</p>
+<figure class="highlight js"><pre>it(<span class="string">'foo'</span>, <span class="function"><span class="keyword">function</span> <span class="title">foo</span><span class="params">()</span> {</span>
+  <span class="keyword">var</span> a = <span class="string">'foo'</span>;
+  <span class="keyword">var</span> b = <span class="string">'b'</span>;
+  assert(expr(capture(capture(a, <span class="string">'/0/left'</span>) === capture(b, <span class="string">'/0/right'</span>), <span class="string">'/0'</span>), {
+      content: <span class="string">'assert(a === b)'</span>,
+      filepath: <span class="string">'bizLogger.test.ts'</span>,
+      line: <span class="number">107</span>
+  }));
+})
+</pre></figure>
+
+<blockquote>
+<p>注：上面的代码不是真实运行的代码，经过一些删减</p>
+</blockquote>
+<p>对于 <code>assert(a === b);</code> 这样一个表达式，会通过 <code>capture</code> 捕获每一个运算过程的位置和值，最终通过 <code>expr</code> 运算。这样经过转换后，代码运行逻辑不变，但是异常发生的时候可以返回 assert 表达式中每一步的返回值。</p>
+<p>我所遇到的问题也就是因为 power-assert 对代码进行了转换，最终异常抛出时，真实 js 异常位置信息是转换后的位置，这个位置自然是无法正确定位到源码位置了。</p>
+<p>但只运行 power-assert ，不引用 source-map-support 的时候，错误行号还是对的。这是因为 <a href="https://github.com/power-assert-js/espower-source" target="_blank">espower-source</a> 返回重新编译后的源码后，还同时对源码文件的 sourceMap 进行了重新转换。所以大部分情况，我们是无法感知到源码有经过重新编译。</p>
+<p>运行简单流程图如下</p>
+<p><img src="https://zos.alipayobjects.com/rmsportal/SObbiICZwSjuUcFlUrTg.svg" alt="img"></p>
+<h3 id="-">解决问题</h3>
+<p>回到最初的问题，跑用例的时候行号不对了。power-assert 的影响在于两点</p>
+<ol>
+<li>测试文件源码会被 power-assert 修改，增加一些信息收集代码</li>
+<li>power-assert 同时有引入 <a href="https://github.com/evanw/node-source-map-support" target="_blank">source-map-support</a> 来对错误堆栈进行重新定位</li>
+</ol>
+<p>当我在我自己的业务中也引入 <a href="https://github.com/evanw/node-source-map-support" target="_blank">source-map-support</a> 来重新定位错误堆栈时，我所拿到的源码是被 power-assert 修改过的，所以这时候是无法重新定位到正确的 ts 位置了。</p>
+<p>既然 power-assert 有引入 sourceMap ，那么是不是我关闭自己引入的 sourceMap 就可以了呢？理论上是应该如此的，但是因为 power-assert 对 sourceMap 文件不支持(inline sourcemap 是支持的)，所以只能定位到 js 源码，无法定位到 ts 源码。</p>
+<p>问题确定了，就可以自己动手解决了，我发了一个 <a href="https://github.com/power-assert-js/espower-source/pull/14" target="_blank">mr</a> 让 espower-source 支持 sourceMap 文件，最新版的 power-assert 已经可以正确定位到 ts 源码位置了。</p>
+<p>另外，还有一个问题，正常情况 source-map-support 同时引入两遍，只要引入的文件路径一直，也是不会有问题的。但 power-assert 使用的还是老版本 source-map-support ，而且老版定位位置信息还是不够准确，这个也很好解决，<a href="https://github.com/power-assert-js/espower-loader/pull/6/" target="_blank">升级依赖版本</a>既可以。</p>
+<p>这两个问题解决后，在自己的业务用引入 source-map-support 也没有问题了，power-assert 返回的错误堆栈也可以正确的指向 sourceMap 位置了。</p>
+<h2 id="-">总结</h2>
+<p>基于 V8 的 <a href="https://github.com/v8/v8/wiki/Stack-Trace-API" target="_blank">Stack Trace API</a> 的使用，浏览器的 sourceMap 能力也可以应用到 Node 服务器场景下，使用 npm 包 <a href="https://github.com/evanw/node-source-map-support" target="_blank">source-map-support</a> 就可以了。</p>
+<p>有时候可能会遇到一些奇怪的错误行号的问题，这可能是某个依赖包对 js 进行了转换，毕竟这在前端太常见了，动不动就重新编译 js 源码。</p>
+</div><footer class="post__foot u-cf"><ul class="post__tag u-fl"><li class="post__tag__item"><a href="/tags/Node.js/" class="post__tag__link">Node.js</a></li></ul><a href="/2017/04/09/how-to-use-sourcemap-in-nodejs/#disqus_thread" class="post__foot-link u-fr">0 COMMENTS</a></footer></article><div class="comments"><div id="disqus_thread"><noscript>Please enable JavaScript to view the <a href="//disqus.com/?ref_noscript">comments powered by Disqus.</a>
+</noscript></div></div></main><footer class="site-foot"><div class="site-copy u-fl">© 2017 Eward Song<bdi>&nbsp;❤&nbsp;Theme by <a href="http://unmric.com">unmric</a></bdi></div><menu class="page-menu u-fr"><li class="page-menu__item"><span title="Previous" class="page-menu__link icon-arrow-left page-menu__link--disabled"></span></li><li class="page-menu__item"><a title="Next" href="/2017/02/07/webpack-hmr-principle/" class="page-menu__link icon-arrow-right"></a></li></menu></footer><script>(function(h,g,l,k,j,i){j=h.createElement(g),i=h.getElementsByTagName(g)[0],
+j.src="//"+l+".disqus.com/"+k+".js",i.parentNode.insertBefore(j,i)})
+(document,"script","shepherdwind","embed");
+</script>
